@@ -94,6 +94,12 @@ jobs:
             -parallel-testing-enabled NO \
             -quiet
 
+      - name: Test counts
+        if: always()
+        run: |
+          .github/scripts/test-summary.sh "iPhone" results/iPhone.xcresult
+          .github/scripts/test-summary.sh "iPad" results/iPad.xcresult
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v6
