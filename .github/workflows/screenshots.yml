@@ -1,0 +1,88 @@
+# App Store screenshots, run by hand (Actions → Screenshots → Run workflow).
+# Captures the app with demo recipes on the 6.9" iPhone and 13" iPad simulators that
+# App Store Connect requires, and uploads the PNGs as a downloadable artifact.
+name: Screenshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  XCODE_VERSION: "26.6"
+  XCODEGEN_VERSION: "2.47.0"
+
+jobs:
+  screenshots:
+    name: Capture App Store screenshots
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+
+      - name: Cache XcodeGen
+        uses: actions/cache@v5
+        with:
+          path: ~/.xcodegen
+          key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install XcodeGen
+        run: .github/scripts/install-xcodegen.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Pick and prepare simulators (clean 9:41 status bar)
+        run: |
+          IPHONE="$(.github/scripts/pick-simulator.sh "iPhone 17 Pro Max")"
+          IPAD="$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")"
+          echo "IPHONE_UDID=$IPHONE" >> "$GITHUB_ENV"
+          echo "IPAD_UDID=$IPAD" >> "$GITHUB_ENV"
+          for UDID in "$IPHONE" "$IPAD"; do
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          done
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$IPHONE_UDID" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
+
+      - name: Capture screenshots
+        env:
+          TEST_RUNNER_JIGGER_SCREENSHOTS: "1"
+        run: |
+          set -o pipefail
+          for DEVICE in iPhone iPad; do
+            if [ "$DEVICE" = iPhone ]; then UDID="$IPHONE_UDID"; else UDID="$IPAD_UDID"; fi
+            xcodebuild test-without-building \
+              -project Jigger.xcodeproj -scheme Jigger \
+              -destination "id=$UDID" \
+              -derivedDataPath DerivedData \
+              -resultBundlePath "results/$DEVICE.xcresult" \
+              -only-testing:JiggerUITests/ScreenshotTests \
+              -parallel-testing-enabled NO \
+              -quiet
+            xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE"
+            python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v6
+        with:
+          name: app-store-screenshots
+          path: screenshots/
+          retention-days: 30
