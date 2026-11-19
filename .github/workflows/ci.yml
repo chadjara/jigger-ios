@@ -29,11 +29,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/cache@v5
-        with:
-          path: Packages/JiggerKit/.build
-          key: spm-linux-${{ hashFiles('Packages/JiggerKit/**/*.swift') }}
-          restore-keys: spm-linux-
       - name: Run JiggerKit tests
         run: swift test --package-path Packages/JiggerKit
 
