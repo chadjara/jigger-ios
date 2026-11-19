@@ -1,0 +1,118 @@
+# XcodeGen spec. CI runs `xcodegen generate` to create Jigger.xcodeproj; the project file is never committed.
+name: Jigger
+options:
+  bundleIdPrefix: com.chadjara
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+  configs:
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      VALIDATE_PRODUCT: YES
+
+packages:
+  JiggerKit:
+    path: Packages/JiggerKit
+
+targets:
+  Jigger:
+    type: application
+    platform: iOS
+    sources:
+      - path: Jigger
+        excludes:
+          - "Resources/PrivacyInfo.xcprivacy"
+      - path: Jigger/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: JiggerKit
+        product: JiggerEngine
+      - package: JiggerKit
+        product: JiggerCore
+    info:
+      path: Jigger/Info.plist
+      properties:
+        CFBundleDisplayName: Jigger
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chadjara.jigger
+        PRODUCT_NAME: Jigger
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: YES
+
+  JiggerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [JiggerTests]
+    dependencies:
+      - target: Jigger
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.chadjara.jigger.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Jigger.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Jigger
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  JiggerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [JiggerUITests]
+    dependencies:
+      - target: Jigger
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.chadjara.jigger.uitests
+        TEST_TARGET_NAME: Jigger
+
+schemes:
+  Jigger:
+    build:
+      targets:
+        Jigger: all
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: JiggerTests
+        - name: JiggerUITests
+        - package: JiggerKit/JiggerEngineTests
+        - package: JiggerKit/JiggerCoreTests
+    archive:
+      config: Release

@@ -1,0 +1,105 @@
+# Every pull request: formula/state tests on Linux (cheap), then build and run all unit and UI tests
+# on iOS simulators (iPhone: everything; iPad: the sidebar layout test).
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "reference/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  XCODE_VERSION: "26.6"
+  XCODEGEN_VERSION: "2.47.0"
+
+jobs:
+  core:
+    name: Engine & core tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: Packages/JiggerKit/.build
+          key: spm-linux-${{ hashFiles('Packages/JiggerKit/**/*.swift') }}
+          restore-keys: spm-linux-
+      - name: Run JiggerKit tests
+        run: swift test --package-path Packages/JiggerKit
+
+  ios:
+    name: iOS build & tests (simulator)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+
+      - name: Cache XcodeGen
+        uses: actions/cache@v5
+        with:
+          path: ~/.xcodegen
+          key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install XcodeGen
+        run: .github/scripts/install-xcodegen.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
+
+      - name: Test on iPhone simulator (unit, engine, core and UI tests)
+        run: |
+          set -o pipefail
+          UDID="$(.github/scripts/pick-simulator.sh iPhone)"
+          xcodebuild test-without-building \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$UDID" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath results/iPhone.xcresult \
+            -parallel-testing-enabled NO \
+            -quiet
+
+      - name: Test on iPad simulator (sidebar layout)
+        run: |
+          set -o pipefail
+          UDID="$(.github/scripts/pick-simulator.sh iPad)"
+          xcodebuild test-without-building \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$UDID" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath results/iPad.xcresult \
+            -only-testing:JiggerUITests/JiggerUITests/testIPadShowsSidebarAndSummaryBesideTheCalculator \
+            -parallel-testing-enabled NO \
+            -quiet
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results
+          path: results/
+          retention-days: 7
