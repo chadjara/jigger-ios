@@ -17,7 +17,13 @@ struct JiggerApp: App {
         } else {
             url = JSONFileStore.defaultURL()
         }
-        _store = State(initialValue: AppStore(storage: JSONFileStore(url: url)))
+        let store = AppStore(storage: JSONFileStore(url: url))
+        // UI tests only: preload a backup (used for App Store screenshots). Never active in normal use.
+        if args.contains("-uitesting"), let seed = ProcessInfo.processInfo.environment["JIGGER_SEED"] {
+            store.importBackup(Data(seed.utf8))
+            store.toast = nil
+        }
+        _store = State(initialValue: store)
     }
 
     var body: some Scene {

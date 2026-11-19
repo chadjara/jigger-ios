@@ -43,6 +43,7 @@ Everything builds in GitHub Actions; no Mac is needed.
 | --- | --- | --- |
 | `CI` | every pull request | `swift test` of JiggerKit on Linux (fast), then generate the project, build, and run all unit, engine, core and UI tests on an iPhone simulator, plus the iPad layout test |
 | `TestFlight` | every merge to `main` | archive a signed Release build and upload it to TestFlight; the build number is `<run number>.<attempt>` |
+| `Screenshots` | run by hand (Actions → Screenshots → Run workflow) | capture App Store screenshots with demo recipes on the 6.9" iPhone and 13" iPad simulators; download them from the `app-store-screenshots` artifact |
 
 Both workflows skip changes that only touch documentation or `reference/`.
 
@@ -51,6 +52,10 @@ Both workflows skip changes that only touch documentation or `reference/`.
 - Repository secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8` (the full text of the .p8 file).
 - The App Store Connect API key needs the **Admin** role, or **App Manager** with access to cloud-managed certificates. Xcode uses it to create the distribution certificate and profile in the cloud.
 - The workflow finds your Team ID through the API. If that lookup ever fails, add a repository **variable** named `APPLE_TEAM_ID` holding the 10-character Team ID from developer.apple.com → Account → Membership.
+
+## App Store submission
+
+`docs/app-store/listing.md` has the App Store text, ready to paste: name, subtitle, description, keywords, categories, privacy answers, age rating and review notes. `docs/app-store/privacy-policy.md` is the privacy policy to publish (the Privacy Policy URL is required).
 
 ## Installing a build
 
