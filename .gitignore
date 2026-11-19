@@ -1,0 +1,17 @@
+# Xcode project is generated in CI from project.yml
+*.xcodeproj/
+*.xcworkspace/
+!Packages/**/*.xcworkspace
+DerivedData/
+build/
+*.xcresult
+# SwiftPM
+.build/
+.swiftpm/
+Packages/JiggerKit/Package.resolved
+# Secrets: never commit signing keys
+*.p8
+*.p12
+*.mobileprovision
+# macOS
+.DS_Store
