@@ -61,12 +61,17 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Pick simulators
+        run: |
+          echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh iPhone)" >> "$GITHUB_ENV"
+          echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh iPad)" >> "$GITHUB_ENV"
+
       - name: Build for testing
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
             -project Jigger.xcodeproj -scheme Jigger \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "id=$IPHONE_UDID" \
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             -quiet
@@ -74,10 +79,9 @@ jobs:
       - name: Test on iPhone simulator (unit, engine, core and UI tests)
         run: |
           set -o pipefail
-          UDID="$(.github/scripts/pick-simulator.sh iPhone)"
           xcodebuild test-without-building \
             -project Jigger.xcodeproj -scheme Jigger \
-            -destination "id=$UDID" \
+            -destination "id=$IPHONE_UDID" \
             -derivedDataPath DerivedData \
             -resultBundlePath results/iPhone.xcresult \
             -parallel-testing-enabled NO \
@@ -86,10 +90,9 @@ jobs:
       - name: Test on iPad simulator (sidebar layout)
         run: |
           set -o pipefail
-          UDID="$(.github/scripts/pick-simulator.sh iPad)"
           xcodebuild test-without-building \
             -project Jigger.xcodeproj -scheme Jigger \
-            -destination "id=$UDID" \
+            -destination "id=$IPAD_UDID" \
             -derivedDataPath DerivedData \
             -resultBundlePath results/iPad.xcresult \
             -only-testing:JiggerUITests/JiggerUITests/testIPadShowsSidebarAndSummaryBesideTheCalculator \

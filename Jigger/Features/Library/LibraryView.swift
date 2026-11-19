@@ -121,7 +121,7 @@ struct UnitMenu: View {
 
 private struct LibraryRow: View {
     @Environment(AppStore.self) private var store
-    let item: LibraryItem
+    let item: JiggerCore.LibraryItem // qualified: SwiftUI also exports a LibraryItem
 
     var body: some View {
         let bad = store.invalidFields(item)
