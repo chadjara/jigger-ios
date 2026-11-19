@@ -2,6 +2,13 @@
 
 Jigger is a bar and cocktail drink cost calculator. A working web version already exists; this repo turns it into a native SwiftUI app for iPhone and iPad, published on the App Store.
 
+## App identity
+
+- App Store name: **Jigger Cost**
+- Home-screen display name (`CFBundleDisplayName`): **Jigger**
+- Bundle ID: **com.chadjara.jigger** (already registered; the App Store Connect app record uses it)
+- SKU: jigger-ios
+
 ## The owner has no Mac
 
 The owner cannot install Xcode or any developer tools. Every build, test, signing step and TestFlight upload must run in **GitHub Actions on GitHub-hosted macOS runners**. Never ask the owner to run commands locally or open Xcode.
@@ -10,13 +17,12 @@ The owner cannot install Xcode or any developer tools. Every build, test, signin
 - Deployment target: iOS 17.0 (SwiftData requires it). Universal app: iPhone and iPad.
 - Signing: automatic, cloud-managed, using an App Store Connect API key. There are no local certificates.
 - Secrets available to workflows: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (full text of the .p8 key). Never print them in logs and never commit key material.
-- Bundle ID: ask the owner if not yet recorded here.
 
 ## Reference material (`reference/`)
 
 - `engine.js`: the web calculation engine. It is the source of truth for every formula.
 - `engine.test.js`: its tests. Port **every** case to Swift with identical inputs and expected values so the app matches the website to the cent.
-- `jigger.html`: the complete web app (features, layout, copy, design). Uploaded by the owner.
+- `jigger.html`: the complete web app (features, layout, copy, design).
 - `ui.test.js`: the web integration tests, describing expected app behavior.
 
 ## Non-negotiables
