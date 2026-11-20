@@ -98,13 +98,15 @@ extension AppStore {
         let doc = """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><title>\(esc(title)) cost analysis</title>
         <style>
+        /* No letter-spacing: wide tracking splits words into single letters in the PDF's text layer,
+           which breaks search and copy. Capitals alone carry the headings. */
         body{font:10.5pt/1.5 Futura,"Futura-Medium","Trebuchet MS",Helvetica,sans-serif;color:#1E1C1A;margin:0}
-        h1{font:700 24pt/1.1 Futura,"Futura-Bold",Helvetica,sans-serif;margin:0 0 2pt;letter-spacing:-.01em}
-        h2{font:700 8.5pt/1.2 Futura,"Futura-Bold",Helvetica,sans-serif;margin:20pt 0 6pt;color:#6E5320;
-           text-transform:uppercase;letter-spacing:.14em;border-bottom:.75pt solid #8A6A2B;padding-bottom:3pt}
+        h1{font:700 24pt/1.1 Futura,"Futura-Bold",Helvetica,sans-serif;margin:0 0 2pt}
+        h2{font:700 9pt/1.2 Futura,"Futura-Bold",Helvetica,sans-serif;margin:20pt 0 6pt;color:#6E5320;
+           text-transform:uppercase;border-bottom:.75pt solid #8A6A2B;padding-bottom:3pt}
         table{width:100%;border-collapse:collapse;margin:4pt 0}
         th,td{text-align:left;padding:4pt 6pt;border-bottom:.5pt solid #C4BEB3;vertical-align:top}
-        th{font-size:7.5pt;text-transform:uppercase;letter-spacing:.12em;color:#6B655C;font-weight:500}
+        th{font-size:7.5pt;text-transform:uppercase;color:#6B655C;font-weight:500}
         .r{text-align:right}
         .sub td{color:#6B655C}
         .tot td{font-weight:700;border-top:1pt solid #1E1C1A;border-bottom:none}

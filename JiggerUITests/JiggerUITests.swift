@@ -12,9 +12,11 @@ final class JiggerUITests: XCTestCase {
     // MARK: - Helpers
 
     @discardableResult
-    private func launch(reset: Bool = true) -> XCUIApplication {
+    private func launch(reset: Bool = true, seed: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-uitesting", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + (reset ? ["-reset"] : [])
+        // Optional backup to preload (UI tests only; see JiggerApp).
+        if let seed { app.launchEnvironment["JIGGER_SEED"] = seed }
         app.launch()
         self.app = app
         XCTAssertTrue(element("recipeName").waitForExistence(timeout: 20), "calculator did not appear")
@@ -50,6 +52,8 @@ final class JiggerUITests: XCTestCase {
 
     private func tap(_ id: String) {
         dismissKeyboard()
+        // Wait out any message at the bottom (as a person would) unless we're tapping its Undo.
+        if id != "toastUndo" { waitForToastToClear() }
         let e = element(id)
         XCTAssertTrue(e.waitForExistence(timeout: 5), "\(id) not found")
         e.tap()
@@ -58,6 +62,11 @@ final class JiggerUITests: XCTestCase {
     private func goTo(_ tab: String, sidebarID: String) {
         let tabButton = app.tabBars.buttons[tab].firstMatch
         if tabButton.exists { tabButton.tap() } else { tap(sidebarID) }
+    }
+
+    private func waitForToastToClear() {
+        let toast = app.descendants(matching: .any)["toast"].firstMatch
+        if toast.exists { _ = toast.waitForNonExistence(timeout: 10) }
     }
 
     /// Closes the on-screen keyboard if it's up (or about to appear after a programmatic focus change).
@@ -157,18 +166,31 @@ final class JiggerUITests: XCTestCase {
         XCTAssertTrue(element("open.Classic Margarita").waitForExistence(timeout: 5), "saved recipe missing from list")
     }
 
-    func testSaveToLibraryAndTheIngredientLimit() {
+    func testSaveToLibraryShowsUpInMyIngredients() {
         launch()
         tap("row0.saveToLibrary")
         XCTAssertTrue(element("row0.tag").waitForExistence(timeout: 5), "row 1 isn't linked to My Ingredients")
-        for _ in 0..<20 { tap("addIngredient") }
-        dismissKeyboard()
-        XCTAssertTrue(field("row24.name").waitForExistence(timeout: 5), "recipe didn't reach 25 ingredients")
-        XCTAssertTrue(element("limitNote").waitForExistence(timeout: 5), "25-ingredient note missing")
-        XCTAssertFalse(app.buttons["addIngredient"].isEnabled, "Add ingredient still enabled at 25")
         goTo("Ingredients", sidebarID: "sidebar.ingredients")
         XCTAssertTrue(field("lib.Blanco tequila.price").waitForExistence(timeout: 5), "saved ingredient missing from My Ingredients")
         XCTAssertEqual(text("lib.Blanco tequila.used"), "Not in a recipe")
+    }
+
+    /// Opens a saved 24-ingredient recipe, adds the 25th, and checks the limit is enforced.
+    func testIngredientLimitIs25() {
+        let lines = (1...24).map {
+            #"{"id":"l\#($0)","name":"Item \#($0)","price":"10","size":"750","sizeUnit":"ml","amount":"1","amountUnit":"floz"}"#
+        }.joined(separator: ",")
+        let seed = #"{"app":"jigger","version":1,"library":[],"recipes":[{"id":"big","name":"Punch Bowl","menuPrice":"12","lines":[\#(lines)]}]}"#
+        launch(seed: seed)
+        goTo("Recipes", sidebarID: "sidebar.recipes")
+        tap("open.Punch Bowl")
+        XCTAssertTrue(field("row23.name").waitForExistence(timeout: 5), "saved recipe didn't open with its 24 ingredients")
+        tap("addIngredient")
+        dismissKeyboard()
+        XCTAssertTrue(field("row24.name").waitForExistence(timeout: 5), "25th ingredient wasn't added")
+        XCTAssertTrue(element("limitNote").waitForExistence(timeout: 5), "25-ingredient note missing")
+        XCTAssertFalse(app.buttons["addIngredient"].isEnabled, "Add ingredient still enabled at 25")
+        XCTAssertFalse(app.buttons["addFromLibrary"].isEnabled, "Add from My Ingredients still enabled at 25")
     }
 
     /// iPad: sidebar navigation with the calculator and summary side by side.
