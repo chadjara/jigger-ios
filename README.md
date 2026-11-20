@@ -41,15 +41,18 @@ Everything builds in GitHub Actions; no Mac is needed.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `CI` | every pull request | `swift test` of JiggerKit on Linux (fast), then generate the project, build, and run all unit, engine, core and UI tests on an iPhone simulator, plus the iPad layout test |
+| `CI` | every pull request | `swift test` of JiggerKit on Linux (fast), then generate the project and build it for an iPhone simulator. **Draft PRs** run only the app unit tests on the simulator (about 3 macOS minutes). **Ready-for-review PRs** run every unit, engine, core and UI test on iPhone, plus the iPad layout test |
 | `TestFlight` | every merge to `main` | archive a signed Release build and upload it to TestFlight; the build number is the workflow's run number (3, 4, 5…) |
 | `Screenshots` | run by hand (Actions → Screenshots → Run workflow) | capture App Store screenshots with demo recipes on the 6.9" iPhone and 13" iPad simulators; download them from the `app-store-screenshots` artifact |
 
-Both workflows skip changes that only touch documentation or `reference/`.
+`CI` and `TestFlight` skip changes that only touch documentation or `reference/`. A new push cancels the CI run it replaces. macOS minutes count 10× against a private repo's Actions allowance, so keep PRs as drafts while iterating and mark them ready once, for the full run before merging.
 
 ### Version numbers
 
-The version lives in `project.yml` (`MARKETING_VERSION`). Each release bumps only the last number (1.0.1, 1.0.2, …); the middle or first number changes only when the owner asks. TestFlight shows it with the build counter, e.g. "1.0.1 (4)".
+Two numbers identify every upload: the **version** (`MARKETING_VERSION` in `project.yml`) and the **build number** (the `TestFlight` workflow's run number, set automatically). TestFlight shows them as "1.0.0 (4)".
+
+- **Before the App Store launch:** the version stays **1.0.0**. Each TestFlight upload is a new build of 1.0.0 (builds 4, 5, 6, …), and the first App Store release ships as 1.0.0.
+- **After launch** (semantic versioning): 1.0.1 for fixes, 1.1.0 for new features, 2.0.0 for a major overhaul. Change `MARKETING_VERSION` in the PR that starts the release; the build number keeps counting up on its own.
 
 ### Signing setup (one time)
 
