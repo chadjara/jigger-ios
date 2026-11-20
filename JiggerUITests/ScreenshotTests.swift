@@ -68,10 +68,12 @@ final class ScreenshotTests: XCTestCase {
         item.tap()
     }
 
+    /// Dismisses the "Saved" message (tapping it closes it) and waits for it to go, without failing
+    /// the capture if it lingers on a slow simulator.
     private func waitForToastToClear() {
         let toast = app.descendants(matching: .any)["toast"].firstMatch
-        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: toast)
-        wait(for: [gone], timeout: 10)
+        if toast.waitForExistence(timeout: 2), toast.isHittable { toast.tap() }
+        _ = toast.waitForNonExistence(timeout: 15)
     }
 
     private func snap(_ name: String) {
