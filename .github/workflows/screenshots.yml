@@ -21,6 +21,10 @@ on:
         description: "With upload ticked: only list what App Store Connect has, change nothing"
         type: boolean
         default: false
+      inspect:
+        description: "Only list the Xcodes and simulators on the runner (looks for iPhone Duo), change nothing"
+        type: boolean
+        default: false
       ipad_from_run:
         description: "Use iPad screenshots from this earlier Screenshots run ID instead of capturing"
         default: ""
@@ -35,9 +39,28 @@ env:
   XCODEGEN_VERSION: "2.47.0"
 
 jobs:
+  inspect:
+    name: List Xcodes and simulators
+    if: inputs.inspect
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Xcodes, simulator runtimes and device types
+        run: |
+          echo "== Xcodes =="; ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          echo "== Runtimes =="; xcrun simctl list runtimes
+          echo "== Device types matching Duo/Fold =="; xcrun simctl list devicetypes | grep -iE "duo|fold" || echo "(none)"
+          echo "== Devices matching Duo/Fold =="; xcrun simctl list devices | grep -iE "duo|fold" || echo "(none)"
+          echo "== simctl commands mentioning fold/display/posture =="; xcrun simctl help 2>&1 | grep -iE "fold|display|posture|hinge" || echo "(none)"
+          for X in /Applications/Xcode*.app; do
+            echo "== $X device types (Duo/Fold) =="
+            ls "$X/Contents/Developer/Platforms/iPhoneOS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes" 2>/dev/null | grep -iE "duo|fold" || echo "(none)"
+          done
+
   screenshots:
     name: Capture App Store screenshots
-    if: inputs.devices != 'none'
+    if: inputs.devices != 'none' && !inputs.inspect
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -126,7 +149,7 @@ jobs:
   upload:
     name: Upload to App Store Connect
     needs: screenshots
-    if: always() && inputs.upload
+    if: always() && inputs.upload && !inputs.inspect
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
