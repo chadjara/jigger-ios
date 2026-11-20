@@ -12,10 +12,11 @@ struct RecipesView: View {
         let list = store.filteredRecipes(query)
         List {
             Section {
-                Text("Costs update automatically when you change prices in My Ingredients.")
-                    .font(.subheadline)
+                Text("Costs follow your bottle prices. Change a price in My Ingredients and every recipe here recalculates.")
+                    .font(Theme.subhead)
                     .foregroundStyle(Theme.muted)
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
             if store.recipes.isEmpty {
                 EmptyStateView(title: "No saved recipes yet",
@@ -41,17 +42,20 @@ struct RecipesView: View {
                         Button { store.duplicateRecipe(recipe.id) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                         Button(role: .destructive) { store.deleteRecipe(recipe.id) } label: { Label("Delete", systemImage: "trash") }
                     }
-                    .listRowBackground(Theme.surface)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparatorTint(Theme.line)
                 }
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .searchable(text: $query, prompt: "Search recipes")
         .navigationTitle("Saved Recipes")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("New Recipe") { store.startNewRecipe(); openCalculator() }
+                Button { store.startNewRecipe(); openCalculator() } label: { Text("New").font(Theme.body) }
+                    .accessibilityLabel("New recipe")
                     .accessibilityIdentifier("newRecipeFromList")
             }
         }
@@ -66,51 +70,55 @@ private struct RecipeRow: View {
     var body: some View {
         let t = store.totals(recipe)
         let n = recipe.lines.count
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Button(action: open) {
                     Text(recipe.name.isEmpty ? "Untitled drink" : recipe.name)
-                        .font(Theme.heading(20, relativeTo: .headline))
+                        .font(Theme.heading(21, relativeTo: .title3))
                         .foregroundStyle(Theme.text)
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("open.\(recipe.name)")
-                Spacer()
+                Spacer(minLength: 8)
                 Menu {
                     Button { open() } label: { Label("Open", systemImage: "pencil") }
                     Button { store.duplicateRecipe(recipe.id) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                     Button(role: .destructive) { store.deleteRecipe(recipe.id) } label: { Label("Delete", systemImage: "trash") }
                 } label: {
-                    Image(systemName: "ellipsis.circle").foregroundStyle(Theme.muted).frame(width: 36, height: 36)
+                    Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.muted)
+                        .frame(width: 40, height: 32)
                 }
                 .accessibilityLabel("Actions for \(recipe.name)")
                 .accessibilityIdentifier("actions.\(recipe.name)")
             }
-            Text("\(n) ingredient\(n == 1 ? "" : "s"), updated \(store.displayDate(recipe.updatedAt))")
-                .font(.footnote)
-                .foregroundStyle(Theme.muted)
-            HStack(alignment: .top) {
-                figure("Cost per drink", store.money(t.drinkCost))
-                figure("Menu price", store.money(typed: recipe.menuPrice))
+            Text("\(n) ingredient\(n == 1 ? "" : "s") · updated \(store.displayDate(recipe.updatedAt))")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.faint)
+            HStack(alignment: .top, spacing: 0) {
+                figure("Cost", store.money(t.drinkCost), accent: false)
+                figure("Menu", store.money(typed: recipe.menuPrice), accent: false)
                 if t.bevCostPct != nil {
-                    figure("Beverage cost", formatPct(t.bevCostPct))
+                    figure("Bev cost", formatPct(t.bevCostPct), accent: true)
                 } else {
-                    figure("Suggested price", store.money(t.suggestedPrice))
+                    figure("Charge", store.money(t.suggestedPrice), accent: true)
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 14)
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("recipe.\(recipe.name)")
     }
 
-    private func figure(_ label: String, _ value: String) -> some View {
+    private func figure(_ label: String, _ value: String, accent: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(Theme.muted)
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(Theme.text)
+            Text(label).capsLabel()
+            Text(value)
+                .font(Theme.figure(20, relativeTo: .title3))
+                .monospacedDigit()
+                .foregroundStyle(accent ? Theme.brass : Theme.text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -7,6 +7,7 @@ struct JiggerApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        ChromeAppearance.apply()
         let args = ProcessInfo.processInfo.arguments
         let url: URL
         if args.contains("-uitesting") {

@@ -13,30 +13,37 @@ struct LibraryPicker: View {
             let items = store.filteredLibrary(query)
             List {
                 if store.library.isEmpty {
-                    Text("Nothing saved yet. Use the bookmark on any ingredient row to save it here, or add bottles under My Ingredients.")
+                    Text("Nothing saved yet. Tap the bookmark on any ingredient to save it here, or add one under My Ingredients.")
+                        .font(Theme.callout)
                         .foregroundStyle(Theme.muted)
                 } else if items.isEmpty {
-                    Text("No saved ingredient matches “\(query)”.").foregroundStyle(Theme.muted)
+                    Text("No saved ingredient matches “\(query)”.").font(Theme.callout).foregroundStyle(Theme.muted)
                 } else {
                     ForEach(items) { item in
                         Button { onPick(item.id) } label: {
-                            HStack {
-                                Text(item.name).foregroundStyle(Theme.text)
-                                Spacer()
-                                Text("\(store.packageLabel(size: item.size, unit: item.sizeUnit)), \(store.money(typed: item.price))")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Theme.muted)
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(item.name).font(Theme.body).foregroundStyle(Theme.text).lineLimit(1)
+                                DotLeader()
+                                Text(store.packageLabel(size: item.size, unit: item.sizeUnit))
+                                    .font(Theme.caption).foregroundStyle(Theme.faint).fixedSize()
+                                Text(store.money(typed: item.price))
+                                    .font(Theme.futura(15, .bold, relativeTo: .subheadline)).foregroundStyle(Theme.text).fixedSize()
                             }
+                            .padding(.vertical, 4)
                         }
                         .accessibilityIdentifier("pick.\(item.name)")
                     }
                 }
             }
+            .listStyle(.plain)
+            .font(Theme.body)
             .searchable(text: $query, prompt: "Search saved ingredients")
             .navigationTitle("My Ingredients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: { Text("Cancel").font(Theme.body) }
+                }
             }
         }
         .presentationDetents([.medium, .large])

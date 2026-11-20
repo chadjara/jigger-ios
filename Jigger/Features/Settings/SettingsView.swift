@@ -36,15 +36,17 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("setTheme")
             } header: {
-                Text("Defaults")
+                Text("Defaults").capsLabel()
             } footer: {
-                Text("Used for new recipes and how prices are shown.")
+                Text("Used for new recipes and how prices are shown.").font(Theme.footnote)
             }
 
-            Section("How conversions work") {
+            Section {
                 Text("Costs are always calculated from exactly what you typed, using exact unit factors. When you switch between oz and mL, pours are shown using the bar convention of 1 oz ≈ 30 mL (1.5 oz shows as 45 mL), and switching never changes what you entered. Fluid ounces measure volume; “oz wt” measures weight.")
-                    .font(.subheadline)
+                    .font(Theme.subhead)
                     .foregroundStyle(Theme.muted)
+            } header: {
+                Text("How conversions work").capsLabel()
             }
 
             Section {
@@ -53,27 +55,30 @@ struct SettingsView: View {
                 Button("Import backup") { showImporter = true }
                     .accessibilityIdentifier("importData")
             } header: {
-                Text("Back up your data")
+                Text("Back up your data").capsLabel()
             } footer: {
-                Text("Recipes and ingredients are stored on this device only. Export a backup to keep them safe or move them to another device or the Jigger website. Importing adds to what’s already here.")
+                Text("Recipes and ingredients are stored on this device only. Export a backup to keep them safe or move them to another device or the Jigger website. Importing adds to what’s already here.").font(Theme.footnote)
             }
 
             Section {
                 Button("Delete all data", role: .destructive) { confirmReset = true }
                     .accessibilityIdentifier("resetData")
             } header: {
-                Text("Start over")
+                Text("Start over").capsLabel()
             } footer: {
-                Text("Deletes every saved recipe and ingredient from this device. Settings are kept.")
+                Text("Deletes every saved recipe and ingredient from this device. Settings are kept.").font(Theme.footnote)
             }
 
-            Section("About") {
+            Section {
                 LabeledContent("Version", value: appVersion)
                 Text("Jigger works offline. It has no accounts, no ads and no tracking, and your data never leaves this device unless you export or share it.")
-                    .font(.footnote)
+                    .font(Theme.footnote)
                     .foregroundStyle(Theme.muted)
+            } header: {
+                Text("About").capsLabel()
             }
         }
+        .font(Theme.body)
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Settings")

@@ -2,7 +2,7 @@ import SwiftUI
 import JiggerCore
 import JiggerEngine
 
-/// One ingredient: what you paid, the package, how much goes in the drink, and what that costs.
+/// One numbered line on the spec sheet: what you paid, the package, the pour, and what that pour costs.
 struct IngredientRow: View {
     @Environment(AppStore.self) private var store
     let line: Line
@@ -18,106 +18,120 @@ struct IngredientRow: View {
         let dim = dimension(of: resolved.sizeUnit) ?? .volume
         let displayName = resolved.name.isEmpty ? "ingredient" : resolved.name
 
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .bottom, spacing: 4) {
-                JField(label: "Ingredient", text: binding(.name, resolved.name), placeholder: "e.g. Tito’s Vodka",
-                       keyboard: .default, disabled: item != nil, identifier: id("name"),
-                       focus: focus, focusValue: .line(line.id, .name))
-                if item == nil {
-                    IconButton(systemImage: "bookmark", label: "Save \(displayName) to My Ingredients", identifier: id("saveToLibrary")) {
-                        switch store.saveLineToLibrary(line.id) {
-                        case .needsName: focus.wrappedValue = .line(line.id, .name)
-                        case .needsPrice: focus.wrappedValue = .line(line.id, .price)
-                        case .needsSize: focus.wrappedValue = .line(line.id, .size)
-                        case .saved: break
-                        }
-                    }
-                }
-                IconButton(systemImage: "xmark", label: "Remove \(displayName)", danger: true, identifier: id("remove")) {
-                    focus.wrappedValue = nil
-                    store.removeLine(line.id)
-                }
-            }
+        HStack(alignment: .top, spacing: 14) {
+            // Line number, in brass; turns red when something on the line needs fixing.
+            Text(String(format: "%02d", index + 1))
+                .font(Theme.futura(13, .bold, relativeTo: .footnote))
+                .monospacedDigit()
+                .foregroundStyle(errors.isEmpty ? Theme.brass : Theme.danger)
+                .frame(width: 22, alignment: .leading)
+                .padding(.top, 22)
+                .accessibilityHidden(true)
 
-            HStack(alignment: .bottom, spacing: 8) {
-                JField(label: "Price paid", text: binding(.price, resolved.price), placeholder: "0.00",
-                       prefix: store.currencySymbol, invalid: errors[.price] != nil, identifier: id("price"),
-                       focus: focus, focusValue: .line(line.id, .price))
-                    .frame(maxWidth: 140)
-                packageField(resolved: resolved, linked: item != nil, invalid: errors[.size] != nil)
-            }
-
-            HStack(alignment: .bottom, spacing: 8) {
-                HStack(alignment: .bottom, spacing: 6) {
-                    JField(label: "Used per drink", text: amountBinding, placeholder: dim == .count ? "e.g. 1/2" : "0",
-                           keyboard: .numbersAndPunctuation, invalid: errors[.amount] != nil, identifier: id("amount"),
-                           focus: focus, focusValue: .line(line.id, .amount))
-                        .frame(maxWidth: 140)
-                    amountUnit(dim: dim)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(store.lineCostText(result))
-                        .font(.headline)
-                        .monospacedDigit()
-                        .accessibilityIdentifier(id("cost"))
-                    Text(store.lineShareText(result, totals: totals))
-                        .font(.caption)
-                        .foregroundStyle(Theme.faint)
-                }
-                .padding(.bottom, 8)
-            }
-
-            if dim == .volume {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(Catalog.pours(for: store.settings.displayUnit), id: \.self) { pour in
-                            Chip(title: pour, selected: store.isPourSelected(line, pour), identifier: id("pour.\(pour)")) {
-                                store.tapPour(line.id, pour)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .bottom, spacing: 0) {
+                    JField(label: "Ingredient", text: binding(.name, resolved.name), placeholder: "e.g. Tito’s Vodka",
+                           keyboard: .default, disabled: item != nil, identifier: id("name"),
+                           focus: focus, focusValue: .line(line.id, .name))
+                    if item == nil {
+                        IconButton(systemImage: "bookmark", label: "Save \(displayName) to My Ingredients", identifier: id("saveToLibrary")) {
+                            switch store.saveLineToLibrary(line.id) {
+                            case .needsName: focus.wrappedValue = .line(line.id, .name)
+                            case .needsPrice: focus.wrappedValue = .line(line.id, .price)
+                            case .needsSize: focus.wrappedValue = .line(line.id, .size)
+                            case .saved: break
                             }
                         }
                     }
+                    IconButton(systemImage: "xmark", label: "Remove \(displayName)", danger: true, identifier: id("remove")) {
+                        focus.wrappedValue = nil
+                        store.removeLine(line.id)
+                    }
                 }
-                .accessibilityLabel("Common pours in \(store.unitLabel(store.settings.displayUnit, pour: true))")
-            }
 
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let item {
-                        if line.priceOverride {
-                            Label("Custom price in this recipe", systemImage: "bookmark.fill")
-                                .accessibilityIdentifier(id("tag"))
-                            Button("Use saved \(store.money(typed: item.price))") { store.revertPrice(line.id) }
-                                .font(.caption.weight(.medium))
-                                .accessibilityIdentifier(id("revertPrice"))
-                        } else {
-                            Label("From My Ingredients", systemImage: "bookmark.fill")
-                                .accessibilityIdentifier(id("tag"))
+                HStack(alignment: .bottom, spacing: 16) {
+                    JField(label: "Price paid", text: binding(.price, resolved.price), placeholder: "0.00",
+                           prefix: store.currencySymbol, invalid: errors[.price] != nil, identifier: id("price"),
+                           focus: focus, focusValue: .line(line.id, .price))
+                        .frame(width: 112)
+                    packageField(resolved: resolved, linked: item != nil, invalid: errors[.size] != nil)
+                }
+
+                HStack(alignment: .bottom, spacing: 16) {
+                    HStack(alignment: .bottom, spacing: 8) {
+                        JField(label: "Pour", text: amountBinding, placeholder: dim == .count ? "1/2" : "0",
+                               keyboard: .numbersAndPunctuation, invalid: errors[.amount] != nil, identifier: id("amount"),
+                               focus: focus, focusValue: .line(line.id, .amount), spokenLabel: "Used per drink")
+                            .frame(width: 112)
+                        amountUnit(dim: dim)
+                    }
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(store.lineCostText(result))
+                            .font(Theme.figure(24, relativeTo: .title2))
+                            .monospacedDigit()
+                            .foregroundStyle(result?.status == .ok ? Theme.text : Theme.faint)
+                            .accessibilityIdentifier(id("cost"))
+                        Text(store.lineShareText(result, totals: totals))
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.faint)
+                    }
+                }
+
+                if dim == .volume {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Catalog.pours(for: store.settings.displayUnit), id: \.self) { pour in
+                                Chip(title: pour, selected: store.isPourSelected(line, pour), identifier: id("pour.\(pour)")) {
+                                    store.tapPour(line.id, pour)
+                                }
+                            }
                         }
                     }
-                    if let note = store.enteredAsNote(line) {
-                        Text(note).foregroundStyle(Theme.muted).accessibilityIdentifier(id("enteredAs"))
-                    }
+                    .accessibilityLabel("Common pours in \(store.unitLabel(store.settings.displayUnit, pour: true))")
                 }
-                .font(.caption)
-                .foregroundStyle(Theme.brass)
-                Spacer(minLength: 0)
-                JField(label: nil, text: binding(.wastePct, line.wastePct),
-                       placeholder: store.draft.wastePct.isEmpty ? "0" : store.draft.wastePct, prefix: "Waste", suffix: "%",
-                       invalid: errors[.waste] != nil, identifier: id("waste"),
-                       focus: focus, focusValue: .line(line.id, .wastePct), spokenLabel: "Waste percent for this ingredient")
-                    .frame(width: 130)
-                    .font(.footnote)
-            }
 
-            if let result, !result.errorMessages.isEmpty {
-                Text(result.errorMessages.joined(separator: ". "))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.danger)
-                    .accessibilityIdentifier(id("error"))
+                HStack(alignment: .bottom, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let item {
+                            if line.priceOverride {
+                                Text("Custom price in this recipe")
+                                    .font(Theme.caption).foregroundStyle(Theme.brass)
+                                    .accessibilityIdentifier(id("tag"))
+                                Button("Use saved \(store.money(typed: item.price))") { store.revertPrice(line.id) }
+                                    .font(Theme.futura(12, .bold, relativeTo: .caption))
+                                    .foregroundStyle(Theme.brass)
+                                    .underline()
+                                    .accessibilityIdentifier(id("revertPrice"))
+                            } else {
+                                Text("From My Ingredients")
+                                    .font(Theme.caption).foregroundStyle(Theme.brass)
+                                    .accessibilityIdentifier(id("tag"))
+                            }
+                        }
+                        if let note = store.enteredAsNote(line) {
+                            Text(note).font(Theme.note).foregroundStyle(Theme.muted).accessibilityIdentifier(id("enteredAs"))
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    JField(label: "Waste", text: binding(.wastePct, line.wastePct),
+                           placeholder: store.draft.wastePct.isEmpty ? "0" : store.draft.wastePct, suffix: "%",
+                           invalid: errors[.waste] != nil, identifier: id("waste"),
+                           focus: focus, focusValue: .line(line.id, .wastePct),
+                           spokenLabel: "Waste percent for this ingredient", compact: true)
+                        .frame(width: 76)
+                }
+
+                if let result, !result.errorMessages.isEmpty {
+                    Text(result.errorMessages.joined(separator: ". "))
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(id("error"))
+                }
             }
         }
-        .card(invalid: !errors.isEmpty)
+        .padding(.vertical, Theme.rowSpacing)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row\(index)")
     }
@@ -127,15 +141,18 @@ struct IngredientRow: View {
     @ViewBuilder
     private func packageField(resolved: Line, linked: Bool, invalid: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Package").font(Theme.label).foregroundStyle(Theme.muted)
+            Text("Package").capsLabel()
             if linked {
-                Text(store.packageLabel(size: resolved.size, unit: resolved.sizeUnit))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
-                    .accessibilityHint("Edit the package in My Ingredients")
-                    .accessibilityIdentifier(id("package"))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(store.packageLabel(size: resolved.size, unit: resolved.sizeUnit))
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                    Hairline(color: Theme.lineStrong, dashed: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityHint("Edit the package in My Ingredients")
+                .accessibilityIdentifier(id("package"))
             } else if line.pkgMode != "custom" {
                 Menu {
                     ForEach(Catalog.packagePresets) { p in
@@ -147,14 +164,14 @@ struct IngredientRow: View {
                         DispatchQueue.main.async { focus.wrappedValue = .line(line.id, .size) }
                     }
                 } label: {
-                    menuLabel(Catalog.isPreset(size: line.size, unit: line.sizeUnit)
-                              ? "\(store.packageLabel(size: line.size, unit: line.sizeUnit)) bottle"
-                              : store.packageLabel(size: line.size, unit: line.sizeUnit), invalid: invalid)
+                    MenuFieldLabel(text: Catalog.isPreset(size: line.size, unit: line.sizeUnit)
+                                   ? "\(store.packageLabel(size: line.size, unit: line.sizeUnit)) bottle"
+                                   : store.packageLabel(size: line.size, unit: line.sizeUnit), invalid: invalid)
                 }
                 .accessibilityLabel("Package size")
                 .accessibilityIdentifier(id("package"))
             } else {
-                HStack(spacing: 6) {
+                HStack(alignment: .bottom, spacing: 10) {
                     JField(label: nil, text: binding(.size, line.size), placeholder: "Size", invalid: invalid,
                            identifier: id("size"), focus: focus, focusValue: .line(line.id, .size), spokenLabel: "Package size")
                     Menu {
@@ -164,9 +181,9 @@ struct IngredientRow: View {
                         Divider()
                         Button("Bottle sizes…") { store.usePresetPackages(line.id) }
                     } label: {
-                        menuLabel(store.unitLabel(line.sizeUnit), invalid: false)
+                        MenuFieldLabel(text: store.unitLabel(line.sizeUnit))
                     }
-                    .fixedSize()
+                    .frame(width: 84)
                     .accessibilityLabel("Package unit")
                     .accessibilityIdentifier(id("sizeUnit"))
                 }
@@ -187,30 +204,18 @@ struct IngredientRow: View {
                     Button(u.label) { store.setAmountUnit(line.id, u) }
                 }
             } label: {
-                menuLabel(store.unitLabel(line.amountUnit), invalid: false)
+                MenuFieldLabel(text: store.unitLabel(line.amountUnit))
             }
-            .fixedSize()
+            .frame(width: 76)
             .accessibilityLabel("Pour unit")
             .accessibilityIdentifier(id("amountUnit"))
         }
     }
 
     private func unitText(_ s: String) -> some View {
-        Text(s).font(.subheadline).foregroundStyle(Theme.muted).frame(minWidth: 30, minHeight: 40, alignment: .leading)
+        Text(s).font(Theme.callout).foregroundStyle(Theme.muted)
+            .padding(.bottom, 8)
             .accessibilityIdentifier(id("unit"))
-    }
-
-    private func menuLabel(_ text: String, invalid: Bool) -> some View {
-        HStack(spacing: 6) {
-            Text(text).lineLimit(1)
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(Theme.muted)
-        }
-        .foregroundStyle(Theme.text)
-        .padding(.horizontal, 10)
-        .frame(minHeight: 40)
-        .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radiusSmall))
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).strokeBorder(invalid ? Theme.danger : Theme.line))
     }
 
     // MARK: - Bindings
