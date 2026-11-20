@@ -94,6 +94,9 @@ end
 step("Review notes (sign-in not required)") do
   detail = api(:get, "/v1/appStoreVersions/#{version['id']}/appStoreReviewDetail", allow404: true)&.dig("data")
   attrs = { notes: META.fetch("reviewNotes"), demoAccountRequired: false }
+  # Once the record exists, Apple only accepts edits that include the contact details, which this
+  # script never sends; the owner edits the notes on the version page from then on.
+  next "already set" if detail && detail.dig("attributes", "notes").to_s.strip != ""
   if detail
     api(:patch, "/v1/appStoreReviewDetails/#{detail['id']}", { data: { type: "appStoreReviewDetails", id: detail["id"], attributes: attrs } })
   else
