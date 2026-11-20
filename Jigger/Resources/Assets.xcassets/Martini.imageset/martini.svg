@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Martini glass: outlined V bowl, olive on a pick, stem and foot. Filled shapes only, for template tinting. -->
+  <path fill="#000000" fill-rule="evenodd" d="M2.2 3.4 H21.8 L12.75 13.05 V19.35 H16.2 A0.85 0.85 0 0 1 16.2 21.05 H7.8 A0.85 0.85 0 0 1 7.8 19.35 H11.25 V13.05 Z M5.55 4.9 L12 11.78 L18.45 4.9 Z"/>
+  <path fill="#000000" d="M10.5 8.1 L15.7 1.35 L16.5 1.96 L11.3 8.71 Z"/>
+  <circle fill="#000000" cx="10.9" cy="8.4" r="1.7"/>
+</svg>

@@ -8,7 +8,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .calculator: return "Calculator"
+        case .calculator: return "Mix"
         case .recipes: return "Saved Recipes"
         case .ingredients: return "My Ingredients"
         case .settings: return "Settings"
@@ -17,19 +17,20 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var tabTitle: String {
         switch self {
-        case .calculator: return "Calculator"
+        case .calculator: return "Mix"
         case .recipes: return "Recipes"
         case .ingredients: return "Ingredients"
         case .settings: return "Settings"
         }
     }
 
-    var systemImage: String {
+    /// Mix uses the app's own martini glass (SF Symbols has no martini); the rest are system symbols.
+    var icon: Image {
         switch self {
-        case .calculator: return "function"
-        case .recipes: return "book.closed"
-        case .ingredients: return "bookmark"
-        case .settings: return "gearshape"
+        case .calculator: return Image("Martini")
+        case .recipes: return Image(systemName: "book.closed")
+        case .ingredients: return Image(systemName: "bookmark")
+        case .settings: return Image(systemName: "gearshape")
         }
     }
 }
@@ -45,7 +46,7 @@ struct RootView: View {
             if sizeClass == .regular {
                 NavigationSplitView {
                     List(AppSection.allCases, selection: sectionSelection) { s in
-                        Label(s.title, systemImage: s.systemImage)
+                        Label { Text(s.title).font(Theme.body) } icon: { s.icon }
                             .tag(s)
                             .accessibilityIdentifier("sidebar.\(s.rawValue)")
                     }
@@ -60,12 +61,13 @@ struct RootView: View {
                 TabView(selection: $section) {
                     ForEach(AppSection.allCases) { s in
                         NavigationStack { content(for: s) }
-                            .tabItem { Label(s.tabTitle, systemImage: s.systemImage) }
+                            .tabItem { Label { Text(s.tabTitle) } icon: { s.icon } }
                             .tag(s)
                     }
                 }
             }
         }
+        .font(Theme.body)
         .background(Theme.bg.ignoresSafeArea())
         .overlay(alignment: .bottom) { toastOverlay }
     }
@@ -90,7 +92,7 @@ struct RootView: View {
             ToastView(message: toast.message, canUndo: toast.undo != nil) {
                 store.undoToast()
             }
-            .padding(.bottom, sizeClass == .regular ? 24 : 96)
+            .padding(.bottom, sizeClass == .regular ? 24 : 120)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .id(toast.id)
             .task(id: toast.id) {

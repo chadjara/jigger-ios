@@ -1,34 +1,89 @@
 import SwiftUI
 
-// Small shared building blocks. Views compose these instead of restyling controls one by one.
+// Shared building blocks. Screens compose these; none of them restyle controls on their own.
 
-/// Card surface used for ingredient rows, panels and lists.
-struct CardModifier: ViewModifier {
-    var padding: CGFloat = 12
-    var invalid = false
+// MARK: - Rules and panels
+
+/// A one-point rule. Rules, not boxes, organise every screen.
+struct Hairline: View {
+    var color: Color = Theme.line
+    var dashed = false
+
+    var body: some View {
+        if dashed {
+            HLine().stroke(color, style: StrokeStyle(lineWidth: Theme.hairline, dash: [3, 3]))
+                .frame(height: Theme.hairline)
+        } else {
+            Rectangle().fill(color).frame(height: Theme.hairline)
+        }
+    }
+}
+
+/// A horizontal line through the middle of its frame.
+struct HLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: rect.minX, y: rect.midY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        }
+    }
+}
+
+/// Menu-style dot leader that runs along the text baseline between a label and its value.
+struct DotLeader: View {
+    var body: some View {
+        HLine()
+            .stroke(Theme.lineStrong, style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [0.01, 4.5]))
+            .frame(minWidth: 14, maxWidth: .infinity)
+            .frame(height: 2)
+            .alignmentGuide(.firstTextBaseline) { d in d[.bottom] - 1 }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Section heading: tracked capitals, then a rule to the edge, then an optional count.
+struct RuleHeader: View {
+    let title: String
+    var trailing: String?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(title).capsLabel(Theme.text).fixedSize()
+                .accessibilityAddTraits(.isHeader)
+            Hairline(color: Theme.lineStrong)
+            if let trailing { Text(trailing).capsLabel(Theme.brass).fixedSize() }
+        }
+    }
+}
+
+struct PanelModifier: ViewModifier {
+    var padding: CGFloat
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
-            .overlay(RoundedRectangle(cornerRadius: Theme.radius)
-                .strokeBorder(invalid ? Theme.danger.opacity(0.6) : Theme.line, lineWidth: 1))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.corner))
+            .overlay(RoundedRectangle(cornerRadius: Theme.corner).strokeBorder(Theme.line, lineWidth: Theme.hairline))
     }
 }
 
 extension View {
+    /// A flat, nearly square surface with a hairline edge.
+    func panel(padding: CGFloat = 16) -> some View {
+        modifier(PanelModifier(padding: padding))
+    }
+
     /// Binds keyboard focus when a focus state is supplied.
     @ViewBuilder
     func focusIf(_ focus: FocusState<FieldFocus?>.Binding?, _ value: FieldFocus?) -> some View {
         if let focus, let value { self.focused(focus, equals: value) } else { self }
     }
-
-    func card(padding: CGFloat = 12, invalid: Bool = false) -> some View {
-        modifier(CardModifier(padding: padding, invalid: invalid))
-    }
 }
 
-/// A labelled text input with an optional prefix ($) or suffix (%), outlined in red when invalid.
+// MARK: - Inputs
+
+/// A text input set on a rule, like a line on an order pad: small caps label above, entry on the line.
+/// The rule thickens and turns red when the entry is invalid, and is dashed when the field is read-only.
 struct JField: View {
     var label: String?
     @Binding var text: String
@@ -43,15 +98,16 @@ struct JField: View {
     var focusValue: FieldFocus?
     /// VoiceOver label when the field has no visible label.
     var spokenLabel: String?
+    /// Smaller type for secondary fields such as a line's waste %.
+    var compact = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let label {
-                Text(label).font(Theme.label).foregroundStyle(Theme.muted)
-            }
-            HStack(spacing: 4) {
-                if let prefix { Text(prefix).foregroundStyle(Theme.faint) }
+            if let label { Text(label).capsLabel() }
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                if let prefix { Text(prefix).font(entryFont).foregroundStyle(Theme.faint) }
                 TextField(placeholder, text: $text)
+                    .font(entryFont)
                     .keyboardType(keyboard)
                     .autocorrectionDisabled(keyboard != .default)
                     .textInputAutocapitalization(keyboard == .default ? .words : .never)
@@ -60,18 +116,44 @@ struct JField: View {
                     .accessibilityLabel(spokenLabel ?? label ?? placeholder)
                     .accessibilityIdentifier(identifier ?? "")
                     .focusIf(focus, focusValue)
-                if let suffix { Text(suffix).foregroundStyle(Theme.faint) }
+                if let suffix { Text(suffix).font(entryFont).foregroundStyle(Theme.faint) }
             }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 40)
-            .background(disabled ? Color.clear : Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radiusSmall))
-            .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall)
-                .strokeBorder(invalid ? Theme.danger : Theme.line, style: StrokeStyle(lineWidth: 1, dash: disabled ? [4, 3] : [])))
+            .frame(minHeight: compact ? 30 : 36)
+            if disabled {
+                Hairline(color: Theme.lineStrong, dashed: true)
+            } else {
+                Rectangle().fill(invalid ? Theme.danger : Theme.lineStrong).frame(height: invalid ? 2 : Theme.hairline)
+            }
         }
+    }
+
+    private var entryFont: Font { compact ? Theme.footnote : Theme.body }
+}
+
+/// The underlined label a menu picker shows, matching `JField`.
+struct MenuFieldLabel: View {
+    let text: String
+    var invalid = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(text).font(Theme.body).lineLimit(1).foregroundStyle(Theme.text)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.brass)
+            }
+            .frame(minHeight: 36)
+            Rectangle().fill(invalid ? Theme.danger : Theme.lineStrong).frame(height: invalid ? 2 : Theme.hairline)
+        }
+        .contentShape(Rectangle())
     }
 }
 
-/// Pill-shaped toggle chip (pours, servings).
+// MARK: - Buttons
+
+/// Square measure button for pours and servings. Selected reads as a filled brass jigger mark.
 struct Chip: View {
     let title: String
     var selected = false
@@ -81,13 +163,14 @@ struct Chip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.footnote.weight(.medium))
+                .font(Theme.futura(13, selected ? .bold : .medium, relativeTo: .footnote))
                 .monospacedDigit()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .foregroundStyle(selected ? Theme.text : Theme.muted)
-                .background(selected ? Theme.brassSoft : Color.clear, in: Capsule())
-                .overlay(Capsule().strokeBorder(selected ? Theme.brass : Theme.line))
+                .padding(.horizontal, 9)
+                .frame(minWidth: 40, minHeight: 32)
+                .foregroundStyle(selected ? Theme.onBrass : Theme.text)
+                .background(selected ? Theme.brass : Color.clear, in: RoundedRectangle(cornerRadius: 2))
+                .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(selected ? Theme.brass : Theme.lineStrong, lineWidth: Theme.hairline))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -95,7 +178,7 @@ struct Chip: View {
     }
 }
 
-/// Brass primary button, or an outlined secondary one.
+/// Buttons are set in tracked Futura capitals: solid brass for the main action, a brass outline otherwise.
 struct JButtonStyle: ButtonStyle {
     var prominent = false
     var compact = false
@@ -103,15 +186,22 @@ struct JButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font((compact ? Font.subheadline : Font.body).weight(.medium))
-            .padding(.horizontal, compact ? 12 : 16)
-            .frame(minHeight: compact ? 34 : 44)
-            .foregroundStyle(prominent ? Theme.onBrass : Theme.text)
-            .background(prominent ? (configuration.isPressed ? Theme.brassStrong : Theme.brass) : Theme.surface,
-                        in: RoundedRectangle(cornerRadius: Theme.radiusSmall))
-            .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall)
-                .strokeBorder(prominent ? Color.clear : (configuration.isPressed ? Theme.brass : Theme.lineStrong)))
-            .opacity(isEnabled ? 1 : 0.45)
+            .font(Theme.futura(compact ? 12 : 13, .bold, relativeTo: .subheadline))
+            .tracking(1.3)
+            .textCase(.uppercase)
+            .padding(.horizontal, compact ? 12 : 18)
+            .frame(minHeight: compact ? 34 : 46)
+            .foregroundStyle(prominent ? Theme.onBrass : Theme.brass)
+            .background(fill(pressed: configuration.isPressed), in: RoundedRectangle(cornerRadius: Theme.corner))
+            .overlay(RoundedRectangle(cornerRadius: Theme.corner)
+                .strokeBorder(prominent ? Color.clear : Theme.brass, lineWidth: Theme.hairline))
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(Rectangle())
+    }
+
+    private func fill(pressed: Bool) -> Color {
+        if prominent { return pressed ? Theme.brassStrong : Theme.brass }
+        return pressed ? Theme.brass.opacity(0.12) : Color.clear
     }
 }
 
@@ -121,7 +211,7 @@ extension ButtonStyle where Self == JButtonStyle {
     static func jSmall(prominent: Bool = false) -> JButtonStyle { JButtonStyle(prominent: prominent, compact: true) }
 }
 
-/// Square icon button (remove, save to library).
+/// Icon-only button with a full 44-point target.
 struct IconButton: View {
     let systemImage: String
     let label: String
@@ -132,18 +222,20 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .medium))
-                .frame(width: 36, height: 36)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(danger ? Theme.danger.opacity(0.85) : Theme.faint)
+        .foregroundStyle(danger ? Theme.danger : Theme.faint)
         .accessibilityLabel(label)
         .accessibilityIdentifier(identifier ?? "")
     }
 }
 
-/// A label and value on one line, value right-aligned.
+// MARK: - Figures
+
+/// "Label ........ value", the way a menu prints a price.
 struct KeyValueRow: View {
     let label: String
     let value: String
@@ -151,16 +243,16 @@ struct KeyValueRow: View {
     var identifier: String?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).foregroundStyle(Theme.muted)
-            Spacer(minLength: 12)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label).font(Theme.subhead).foregroundStyle(Theme.muted).lineLimit(2)
+            DotLeader()
             Text(value)
-                .fontWeight(.semibold)
+                .font(Theme.futura(15, .bold, relativeTo: .subheadline))
                 .monospacedDigit()
                 .foregroundStyle(tone.color)
+                .fixedSize()
                 .accessibilityIdentifier(identifier ?? "")
         }
-        .font(.subheadline)
     }
 }
 
@@ -176,7 +268,7 @@ enum DisplayTone {
     }
 }
 
-/// Centred message for empty lists.
+/// Empty lists get a short, left-aligned note, not a centred billboard.
 struct EmptyStateView: View {
     let title: String?
     let message: String
@@ -184,51 +276,48 @@ struct EmptyStateView: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 8) {
-            if let title { Text(title).font(Theme.heading(22)).foregroundStyle(Theme.text) }
-            Text(message).foregroundStyle(Theme.muted).multilineTextAlignment(.center).frame(maxWidth: 360)
+        VStack(alignment: .leading, spacing: 10) {
+            if let title { Text(title).font(Theme.heading(20, relativeTo: .title3)).foregroundStyle(Theme.text) }
+            Text(message).font(Theme.callout).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
-                Button(actionTitle, action: action).buttonStyle(.jPrimary).padding(.top, 8)
+                Button(actionTitle, action: action).buttonStyle(.jPrimary).padding(.top, 6)
             }
         }
-        .padding(.vertical, 48)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Bottom toast with optional Undo, shown above everything.
+/// Bottom message slip with optional Undo.
 struct ToastView: View {
     let message: String
     let canUndo: Bool
     let undo: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Text(message).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-            if canUndo {
-                Button("Undo", action: undo)
-                    .font(.subheadline.weight(.semibold))
-                    .underline()
+        HStack(spacing: 0) {
+            Rectangle().fill(Theme.brass).frame(width: 3)
+            HStack(spacing: 16) {
+                Text(message).font(Theme.subhead).fixedSize(horizontal: false, vertical: true)
+                if canUndo {
+                    Spacer(minLength: 0)
+                    Button(action: undo) {
+                        Text("Undo").font(Theme.futura(13, .bold, relativeTo: .subheadline)).tracking(1.3).textCase(.uppercase)
+                            .padding(.vertical, 6)
+                    }
+                    .accessibilityLabel("Undo")
                     .accessibilityIdentifier("toastUndo")
+                }
             }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
         }
         .foregroundStyle(Theme.bg)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 16)
-        .background(Theme.text, in: RoundedRectangle(cornerRadius: Theme.radius))
-        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+        .background(Theme.text)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.corner))
+        .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
         .padding(.horizontal, Theme.gutter)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("toast")
-    }
-}
-
-/// Heading used above calculator sections.
-struct SectionHeader: View {
-    let title: String
-    var body: some View {
-        Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text)
-            .accessibilityAddTraits(.isHeader)
     }
 }

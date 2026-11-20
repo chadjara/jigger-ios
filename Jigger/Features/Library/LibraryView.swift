@@ -19,41 +19,55 @@ struct LibraryView: View {
         let items = order.compactMap { store.libraryItem($0) }
         List {
             Section {
-                Text("Save bottles you buy often. Change a price here and every recipe using it recalculates, unless that recipe has its own custom price.")
-                    .font(.subheadline)
+                Text("Save the bottles and produce you buy often. Change a price here and every recipe using it recalculates, unless that recipe has its own custom price.")
+                    .font(Theme.subhead)
                     .foregroundStyle(Theme.muted)
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
-            Section("Add an ingredient") {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField("Ingredient, e.g. Tito’s Vodka", text: $newName)
-                        .textInputAutocapitalization(.words)
-                        .focused($newNameFocused)
-                        .accessibilityIdentifier("libNew.name")
-                    HStack(spacing: 8) {
+            Section {
+                VStack(alignment: .leading, spacing: 16) {
+                    RuleHeader(title: "Add an ingredient")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ingredient").capsLabel()
+                        TextField("e.g. Tito’s Vodka", text: $newName)
+                            .font(Theme.body)
+                            .textInputAutocapitalization(.words)
+                            .focused($newNameFocused)
+                            .frame(minHeight: 36)
+                            .accessibilityLabel("Ingredient")
+                            .accessibilityIdentifier("libNew.name")
+                        Hairline(color: Theme.lineStrong)
+                    }
+                    HStack(alignment: .bottom, spacing: 16) {
                         JField(label: "Price paid", text: normalized($newPrice), placeholder: "0.00", prefix: store.currencySymbol,
                                identifier: "libNew.price")
                         JField(label: "Package size", text: normalized($newSize), placeholder: "750", identifier: "libNew.size")
                         UnitMenu(current: newUnit) { newUnit = $0 }
                     }
-                    Button("Add ingredient") { add() }
+                    Button { add() } label: { Label("Add ingredient", systemImage: "plus") }
                         .buttonStyle(.jPrimary)
                         .accessibilityIdentifier("libAdd")
                 }
-                .padding(.vertical, 4)
-                .listRowBackground(Theme.surface)
+                .padding(.vertical, 12)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
             Section {
+                RuleHeader(title: "Saved", trailing: store.library.isEmpty ? nil : String(format: "%02d", store.library.count))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 if store.library.isEmpty {
-                    EmptyStateView(title: "No saved ingredients yet",
-                                   message: "Add a bottle above, or tap the bookmark on any ingredient row in the calculator.")
+                    EmptyStateView(title: "Nothing saved yet",
+                                   message: "Add one above, or tap the bookmark on any ingredient in Mix.")
                         .listRowBackground(Color.clear)
                 } else if items.isEmpty {
                     EmptyStateView(title: nil, message: "No ingredient matches “\(query)”.").listRowBackground(Color.clear)
                 } else {
                     ForEach(items) { item in
                         LibraryRow(item: item)
-                            .listRowBackground(Theme.surface)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparatorTint(Theme.line)
                             .swipeActions {
                                 Button(role: .destructive) { store.deleteLibraryItem(item.id) } label: { Label("Delete", systemImage: "trash") }
                             }
@@ -61,6 +75,7 @@ struct LibraryView: View {
                 }
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Theme.bg.ignoresSafeArea())
         .scrollDismissesKeyboard(.interactively)
@@ -72,7 +87,7 @@ struct LibraryView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { hideKeyboard() }
+                Button { hideKeyboard() } label: { Text("Done").font(Theme.emphasis) }
             }
         }
     }
@@ -100,22 +115,15 @@ struct UnitMenu: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(" ").font(Theme.label)
+            Text("Unit").capsLabel()
             Menu {
                 ForEach(Catalog.packageUnits, id: \.self) { u in Button(u.label) { choose(u) } }
             } label: {
-                HStack(spacing: 4) {
-                    Text(current?.label ?? "Unit")
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-                .padding(.horizontal, 10)
-                .frame(minHeight: 40)
-                .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radiusSmall))
-                .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).strokeBorder(Theme.line))
+                MenuFieldLabel(text: current?.label ?? "Unit")
             }
-            .fixedSize()
             .accessibilityLabel("Package unit")
         }
+        .frame(width: 84)
     }
 }
 
@@ -126,15 +134,15 @@ private struct LibraryRow: View {
     var body: some View {
         let bad = store.invalidFields(item)
         let used = store.usageCount(item.id)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .bottom) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .bottom, spacing: 0) {
                 JField(label: "Ingredient", text: field(.name, item.name), keyboard: .default, invalid: bad.contains(.name),
                        identifier: "lib.\(item.name).name")
                 IconButton(systemImage: "trash", label: "Delete \(item.name)", danger: true, identifier: "lib.\(item.name).delete") {
                     store.deleteLibraryItem(item.id)
                 }
             }
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 16) {
                 JField(label: "Price paid", text: field(.price, item.price), placeholder: "0.00", prefix: store.currencySymbol,
                        invalid: bad.contains(.price), identifier: "lib.\(item.name).price")
                 JField(label: "Package size", text: field(.size, item.size), invalid: bad.contains(.size),
@@ -142,11 +150,11 @@ private struct LibraryRow: View {
                 UnitMenu(current: JiggerUnit(rawValue: item.sizeUnit)) { store.setLibrarySizeUnit(item.id, $0) }
             }
             Text(used > 0 ? "In \(used) recipe\(used == 1 ? "" : "s")" : "Not in a recipe")
-                .font(.caption)
-                .foregroundStyle(Theme.muted)
+                .font(Theme.caption)
+                .foregroundStyle(used > 0 ? Theme.brass : Theme.faint)
                 .accessibilityIdentifier("lib.\(item.name).used")
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 14)
     }
 
     private func field(_ f: LibraryTextField, _ current: String) -> Binding<String> {

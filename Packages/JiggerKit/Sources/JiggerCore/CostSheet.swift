@@ -98,17 +98,18 @@ extension AppStore {
         let doc = """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><title>\(esc(title)) cost analysis</title>
         <style>
-        body{font:11pt/1.45 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:0}
-        h1{font:600 26pt/1.1 "Bodoni 72",Didot,Georgia,serif;margin:0 0 4pt}
-        h2{font:600 13pt/1.2 -apple-system,Helvetica,Arial,sans-serif;margin:18pt 0 4pt;color:#6E5320}
-        table{width:100%;border-collapse:collapse;margin:6pt 0}
-        th,td{text-align:left;padding:4pt 6pt;border-bottom:.5pt solid #bbb;vertical-align:top}
-        th{font-weight:600;color:#444}
+        body{font:10.5pt/1.5 Futura,"Futura-Medium","Trebuchet MS",Helvetica,sans-serif;color:#1E1C1A;margin:0}
+        h1{font:700 24pt/1.1 Futura,"Futura-Bold",Helvetica,sans-serif;margin:0 0 2pt;letter-spacing:-.01em}
+        h2{font:700 8.5pt/1.2 Futura,"Futura-Bold",Helvetica,sans-serif;margin:20pt 0 6pt;color:#6E5320;
+           text-transform:uppercase;letter-spacing:.14em;border-bottom:.75pt solid #8A6A2B;padding-bottom:3pt}
+        table{width:100%;border-collapse:collapse;margin:4pt 0}
+        th,td{text-align:left;padding:4pt 6pt;border-bottom:.5pt solid #C4BEB3;vertical-align:top}
+        th{font-size:7.5pt;text-transform:uppercase;letter-spacing:.12em;color:#6B655C;font-weight:500}
         .r{text-align:right}
-        .sub td{color:#444}
-        .tot td{font-weight:700;border-top:1pt solid #111}
-        .muted{color:#555;font-size:9.5pt}
-        ul{margin:4pt 0;padding-left:16pt}
+        .sub td{color:#6B655C}
+        .tot td{font-weight:700;border-top:1pt solid #1E1C1A;border-bottom:none}
+        .muted{color:#6B655C;font-size:8.5pt}
+        ul{margin:4pt 0;padding-left:14pt}
         </style></head><body>\(h)</body></html>
         """
         return CostSheet(html: doc, title: title)

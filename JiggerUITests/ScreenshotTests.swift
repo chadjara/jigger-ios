@@ -35,7 +35,7 @@ final class ScreenshotTests: XCTestCase {
             snap("\(device)-04-ingredients")
         } else {
             snap("\(device)-01-calculator")
-            app.buttons["Summary"].firstMatch.tap()
+            element("showSummary").tap()
             snap("\(device)-02-summary")
             element("servings.25").tap()
             snap("\(device)-03-batch")
