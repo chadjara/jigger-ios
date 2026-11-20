@@ -18,10 +18,10 @@ final class AppTests: XCTestCase {
         let doc = try XCTUnwrap(PDFDocument(data: data))
         XCTAssertGreaterThanOrEqual(doc.pageCount, 1)
         let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: "\n")
-        XCTAssertTrue(text.contains("Classic Margarita"))
-        XCTAssertTrue(text.contains("$3.69"))
-        XCTAssertTrue(text.contains("Price ladder"))
-        XCTAssertTrue(text.contains("overhead"))
+        // Section headings are set in capitals by the sheet's CSS, so match case-insensitively.
+        for expected in ["Classic Margarita", "$3.69", "Price ladder", "overhead"] {
+            XCTAssertTrue(text.localizedCaseInsensitiveContains(expected), "PDF text is missing \(expected)")
+        }
     }
 
     @MainActor

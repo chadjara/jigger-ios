@@ -35,7 +35,10 @@ final class JiggerUITests: XCTestCase {
         return e.label
     }
 
+    /// Types into a field. Any keyboard still up from the previous field is dismissed first,
+    /// because it (or its Done bar) can sit on top of the next field and swallow the tap.
     private func type(_ id: String, _ value: String) {
+        dismissKeyboard()
         let f = field(id)
         XCTAssertTrue(f.waitForExistence(timeout: 5), "\(id) not found")
         f.tap()
@@ -46,6 +49,7 @@ final class JiggerUITests: XCTestCase {
     }
 
     private func tap(_ id: String) {
+        dismissKeyboard()
         let e = element(id)
         XCTAssertTrue(e.waitForExistence(timeout: 5), "\(id) not found")
         e.tap()
@@ -56,9 +60,13 @@ final class JiggerUITests: XCTestCase {
         if tabButton.exists { tabButton.tap() } else { tap(sidebarID) }
     }
 
+    /// Closes the on-screen keyboard if it's up (or about to appear after a programmatic focus change).
     private func dismissKeyboard() {
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.waitForExistence(timeout: 0.5) else { return }
         let done = app.toolbars.buttons["Done"].firstMatch
         if done.exists { done.tap() }
+        _ = keyboard.waitForNonExistence(timeout: 3)
     }
 
     // MARK: - Tests
@@ -66,7 +74,7 @@ final class JiggerUITests: XCTestCase {
     func testFirstLaunchShowsTheMargaritaExampleWithCorrectTotals() {
         launch()
         XCTAssertEqual(field("recipeName").value as? String, "Classic Margarita")
-        XCTAssertTrue(element("exampleNotice").exists)
+        XCTAssertTrue(element("exampleNotice").exists, "example notice missing")
         XCTAssertEqual(text("row0.cost"), "$2.52")
         XCTAssertEqual(text("drinkCost"), "$3.69")
         XCTAssertEqual(text("suggestedPrice"), "$18.47")
@@ -87,13 +95,12 @@ final class JiggerUITests: XCTestCase {
         XCTAssertEqual(text("drinkCost"), "$1.97")
         XCTAssertEqual(text("suggestedPrice"), "$9.85")
         tap("addIngredient")
-        XCTAssertTrue(field("row1.name").waitForExistence(timeout: 5))
-        dismissKeyboard()
+        XCTAssertTrue(field("row1.name").waitForExistence(timeout: 5), "new row didn't appear")
         tap("row0.remove")
-        XCTAssertFalse(field("row1.name").exists)
+        XCTAssertFalse(field("row1.name").exists, "row wasn't removed")
         XCTAssertEqual(text("drinkCost"), "$0.00")
         tap("toastUndo")
-        XCTAssertTrue(field("row1.name").waitForExistence(timeout: 5))
+        XCTAssertTrue(field("row1.name").waitForExistence(timeout: 5), "undo didn't restore the row")
         XCTAssertEqual(text("drinkCost"), "$1.97")
     }
 
@@ -117,12 +124,12 @@ final class JiggerUITests: XCTestCase {
         type("row0.price", "abc")
         dismissKeyboard()
         XCTAssertEqual(text("row0.cost"), "—")
-        XCTAssertTrue(element("row0.error").exists)
+        XCTAssertTrue(element("row0.error").exists, "row error message missing")
         type("menuPrice", "0")
         dismissKeyboard()
-        XCTAssertTrue(element("menuError").exists)
+        XCTAssertTrue(element("menuError").exists, "menu price error missing")
         XCTAssertEqual(text("bevCostPct"), "—")
-        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'NaN'")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'NaN'")).firstMatch.exists, "NaN shown")
     }
 
     func testBatchScaling() {
@@ -147,18 +154,20 @@ final class JiggerUITests: XCTestCase {
         XCTAssertEqual(field("menuPrice").value as? String, "15")
         XCTAssertEqual(text("saveState"), "Saved")
         goTo("Recipes", sidebarID: "sidebar.recipes")
-        XCTAssertTrue(element("open.Classic Margarita").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("open.Classic Margarita").waitForExistence(timeout: 5), "saved recipe missing from list")
     }
 
     func testSaveToLibraryAndTheIngredientLimit() {
         launch()
         tap("row0.saveToLibrary")
-        XCTAssertTrue(element("row0.tag").waitForExistence(timeout: 5))
-        for _ in 0..<20 { tap("addIngredient"); dismissKeyboard() }
-        XCTAssertTrue(element("limitNote").waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["addIngredient"].isEnabled)
+        XCTAssertTrue(element("row0.tag").waitForExistence(timeout: 5), "row 1 isn't linked to My Ingredients")
+        for _ in 0..<20 { tap("addIngredient") }
+        dismissKeyboard()
+        XCTAssertTrue(field("row24.name").waitForExistence(timeout: 5), "recipe didn't reach 25 ingredients")
+        XCTAssertTrue(element("limitNote").waitForExistence(timeout: 5), "25-ingredient note missing")
+        XCTAssertFalse(app.buttons["addIngredient"].isEnabled, "Add ingredient still enabled at 25")
         goTo("Ingredients", sidebarID: "sidebar.ingredients")
-        XCTAssertTrue(field("lib.Blanco tequila.price").waitForExistence(timeout: 5))
+        XCTAssertTrue(field("lib.Blanco tequila.price").waitForExistence(timeout: 5), "saved ingredient missing from My Ingredients")
         XCTAssertEqual(text("lib.Blanco tequila.used"), "Not in a recipe")
     }
 
