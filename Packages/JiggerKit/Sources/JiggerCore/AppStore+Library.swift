@@ -19,10 +19,30 @@ extension AppStore {
         state.recipes.filter { $0.lines.contains { $0.libId == itemID } }.count
     }
 
+    /// The saved ingredient identical to this one, if any: same name (ignoring case and spacing)
+    /// and the same package. Different sizes of the same bottle are different ingredients.
+    public func identicalLibraryItem(name: String, size: String, sizeUnit: String, excluding id: String? = nil) -> LibraryItem? {
+        let key = normalizedName(name)
+        guard !key.isEmpty else { return nil }
+        let wantedSize = parseNumber(size).value
+        return state.library.first { it in
+            it.id != id && normalizedName(it.name) == key && it.sizeUnit == sizeUnit
+                && (parseNumber(it.size).value.map { $0 == wantedSize } ?? (it.size == size))
+        }
+    }
+
+    func normalizedName(_ s: String) -> String {
+        s.lowercased().split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
     /// Fields of a library entry that need fixing (used to outline them in red).
+    /// A name that duplicates another saved ingredient with the same package counts as invalid.
     public func invalidFields(_ item: LibraryItem) -> Set<LibraryTextField> {
         var bad = Set<LibraryTextField>()
-        if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { bad.insert(.name) }
+        if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || identicalLibraryItem(name: item.name, size: item.size, sizeUnit: item.sizeUnit, excluding: item.id) != nil {
+            bad.insert(.name)
+        }
         if !(parseNumber(item.price).value.map { $0 >= 0 } ?? false) { bad.insert(.price) }
         if !(parseNumber(item.size).value.map { $0 > 0 } ?? false) { bad.insert(.size) }
         return bad
@@ -32,9 +52,12 @@ extension AppStore {
     @discardableResult
     public func addLibraryItem(name: String, price: String, size: String, sizeUnit: JiggerUnit) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { showToast("Enter a name for the ingredient."); return false }
-        guard let p = parseNumber(price).value, p >= 0 else { showToast("Enter the price you pay, like 24.99."); return false }
-        guard let s = parseNumber(size).value, s > 0 else { showToast("Enter a package size greater than 0."); return false }
+        guard !trimmed.isEmpty else { showToast("Enter a name"); return false }
+        guard let p = parseNumber(price).value, p >= 0 else { showToast("Enter the price you pay"); return false }
+        guard let s = parseNumber(size).value, s > 0 else { showToast("Enter a package size"); return false }
+        guard identicalLibraryItem(name: trimmed, size: size, sizeUnit: sizeUnit.rawValue) == nil else {
+            showToast("Already in My Ingredients"); return false
+        }
         let t = now()
         let item = LibraryItem(id: makeID(), name: trimmed, price: price, size: size, sizeUnit: sizeUnit.rawValue, createdAt: t, updatedAt: t)
         mutateState { $0.library.append(item) }
@@ -91,7 +114,7 @@ extension AppStore {
         if var d = s.draft { detach(&d); s.draft = d }
         s.library.removeAll { $0.id == id }
         mutateState { $0 = s }
-        showToast("Deleted \(it.name). Recipes keep its last price.") { [weak self] in
+        showToast("Deleted \(it.name) · recipes keep its price") { [weak self] in
             guard let self else { return }
             let settings = self.state.settings
             self.mutateState { $0 = snapshot; $0.settings = settings }
@@ -125,6 +148,6 @@ extension AppStore {
         }
         state.draft = newRecipe()
         flush()
-        showToast("All recipes and ingredients were deleted")
+        showToast("All recipes and ingredients deleted")
     }
 }

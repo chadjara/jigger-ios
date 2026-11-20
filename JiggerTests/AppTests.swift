@@ -41,6 +41,23 @@ final class AppTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @MainActor
+    func testRecipeBookAndPriceListRenderAsSearchablePDFs() throws {
+        let s = store()
+        s.saveRecipe()
+        s.addLibraryItem(name: "Tito’s Vodka", price: "24.99", size: "750", sizeUnit: .ml)
+        let book = try XCTUnwrap(PDFDocument(data: CostSheetPDF.render(s.recipeBook())))
+        let bookText = (0..<book.pageCount).compactMap { book.page(at: $0)?.string }.joined(separator: "\n")
+        for expected in ["Recipe book", "Classic Margarita", "Blanco tequila", "$3.69"] {
+            XCTAssertTrue(bookText.localizedCaseInsensitiveContains(expected), "recipe book PDF is missing \(expected)")
+        }
+        let list = try XCTUnwrap(PDFDocument(data: CostSheetPDF.render(s.ingredientPriceList())))
+        let listText = (0..<list.pageCount).compactMap { list.page(at: $0)?.string }.joined(separator: "\n")
+        for expected in ["Bar price list", "Tito’s Vodka", "$0.99 / oz"] {
+            XCTAssertTrue(listText.localizedCaseInsensitiveContains(expected), "price list PDF is missing \(expected)")
+        }
+    }
+
     func testThemeHasDistinctLightAndDarkPalettes() {
         let dark = UIColor(Theme.bg).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
         let light = UIColor(Theme.bg).resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))

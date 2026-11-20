@@ -95,7 +95,7 @@ final class StoreTests: XCTestCase {
         s.startNewRecipe()
         XCTAssertEqual(s.draft.name, "")
         XCTAssertEqual(s.draft.lines.count, 1)
-        XCTAssertTrue(s.toast!.message.contains("Unsaved changes to My drink were set aside"))
+        XCTAssertTrue(s.toast!.message.contains("My drink set aside"))
         s.undoToast()
         XCTAssertEqual(s.draft.name, "My drink")
         // a clean draft is replaced without an undo

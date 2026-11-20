@@ -1,17 +1,25 @@
 import Foundation
 import JiggerEngine
 
-/// Builds the printable cost analysis for a recipe as a self-contained HTML document.
+/// A printable document (cost sheet, recipe book or price list) as self-contained HTML.
 /// The app turns it into a paginated PDF for AirPrint, Save to Files and Share.
 public struct CostSheet {
     public let html: String
     public let title: String
+    /// Ending of the file name, e.g. "cost-sheet" gives "classic-margarita-cost-sheet.pdf".
+    public var fileSuffix: String = "cost-sheet"
+
+    public init(html: String, title: String, fileSuffix: String = "cost-sheet") {
+        self.html = html
+        self.title = title
+        self.fileSuffix = fileSuffix
+    }
 
     /// Suggested PDF file name, e.g. "classic-margarita-cost-sheet.pdf".
     public var fileName: String {
         let slug = title.lowercased().map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" }
         let collapsed = String(slug).split(separator: "-").joined(separator: "-")
-        return "\(collapsed.isEmpty ? "drink" : collapsed)-cost-sheet.pdf"
+        return "\(collapsed.isEmpty ? "drink" : collapsed)-\(fileSuffix).pdf"
     }
 }
 
@@ -95,29 +103,11 @@ extension AppStore {
 
         h += "<p class=\"muted\">Figures cover ingredient and listed additional costs only. They do not include labor, rent, taxes or overhead. Prices are rounded to the cent for display; calculations use exact values.</p>"
 
-        let doc = """
-        <!doctype html><html lang="en"><head><meta charset="utf-8"><title>\(esc(title)) cost analysis</title>
-        <style>
-        /* No letter-spacing: wide tracking splits words into single letters in the PDF's text layer,
-           which breaks search and copy. Capitals alone carry the headings. */
-        body{font:10.5pt/1.5 Futura,"Futura-Medium","Trebuchet MS",Helvetica,sans-serif;color:#1E1C1A;margin:0}
-        h1{font:700 24pt/1.1 Futura,"Futura-Bold",Helvetica,sans-serif;margin:0 0 2pt}
-        h2{font:700 9pt/1.2 Futura,"Futura-Bold",Helvetica,sans-serif;margin:20pt 0 6pt;color:#6E5320;
-           text-transform:uppercase;border-bottom:.75pt solid #8A6A2B;padding-bottom:3pt}
-        table{width:100%;border-collapse:collapse;margin:4pt 0}
-        th,td{text-align:left;padding:4pt 6pt;border-bottom:.5pt solid #C4BEB3;vertical-align:top}
-        th{font-size:7.5pt;text-transform:uppercase;color:#6B655C;font-weight:500}
-        .r{text-align:right}
-        .sub td{color:#6B655C}
-        .tot td{font-weight:700;border-top:1pt solid #1E1C1A;border-bottom:none}
-        .muted{color:#6B655C;font-size:8.5pt}
-        ul{margin:4pt 0;padding-left:14pt}
-        </style></head><body>\(h)</body></html>
-        """
+        let doc = printPage(title: "\(title) cost analysis", body: h)
         return CostSheet(html: doc, title: title)
     }
 
-    private func row(_ label: String, _ value: String) -> String {
+    func row(_ label: String, _ value: String) -> String {
         "<tr><td>\(esc(label))</td><td class=\"r\">\(esc(value))</td></tr>"
     }
 }

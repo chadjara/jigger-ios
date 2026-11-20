@@ -113,7 +113,6 @@ extension AppStore {
     /// Summary line on the collapsed Additional costs section.
     public func extrasSummary(_ r: Recipe, _ t: RecipeTotals) -> String {
         if t.extrasCost > 0 { return "+\(money(t.extrasCost)) per drink" }
-        if !r.wastePct.isEmpty { return "\(r.wastePct)% waste" }
         return "None added"
     }
 

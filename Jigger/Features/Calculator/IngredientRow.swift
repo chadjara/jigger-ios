@@ -9,6 +9,8 @@ struct IngredientRow: View {
     let index: Int
     let totals: RecipeTotals
     var focus: FocusState<FieldFocus?>.Binding
+    /// Opens the drag-to-reorder list.
+    let onReorder: () -> Void
 
     var body: some View {
         let resolved = store.resolve(line)
@@ -19,14 +21,33 @@ struct IngredientRow: View {
         let displayName = resolved.name.isEmpty ? "ingredient" : resolved.name
 
         HStack(alignment: .top, spacing: 14) {
-            // Line number, in brass; turns red when something on the line needs fixing.
-            Text(String(format: "%02d", index + 1))
-                .font(Theme.futura(13, .bold, relativeTo: .footnote))
-                .monospacedDigit()
-                .foregroundStyle(errors.isEmpty ? Theme.brass : Theme.danger)
-                .frame(width: 22, alignment: .leading)
-                .padding(.top, 22)
-                .accessibilityHidden(true)
+            // Line number, in brass (red when something needs fixing). Tap it to move the line.
+            Menu {
+                ForEach(LineMove.allCases, id: \.self) { move in
+                    Button { focus.wrappedValue = nil; store.moveLine(line.id, move) } label: {
+                        Label(move.label, systemImage: move.systemImage)
+                    }
+                    .disabled(!store.canMoveLine(line.id, move))
+                }
+                Divider()
+                Button { focus.wrappedValue = nil; onReorder() } label: { Label("Reorder…", systemImage: "line.3.horizontal") }
+            } label: {
+                VStack(spacing: 3) {
+                    Text(String(format: "%02d", index + 1))
+                        .font(Theme.futura(13, .bold, relativeTo: .footnote))
+                        .monospacedDigit()
+                        .foregroundStyle(errors.isEmpty ? Theme.brass : Theme.danger)
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Theme.faint)
+                }
+                .frame(width: 26, height: 44)
+                .contentShape(Rectangle())
+            }
+            .padding(.top, 10)
+            .accessibilityLabel("Ingredient \(index + 1) options")
+            .accessibilityHint("Move this ingredient")
+            .accessibilityIdentifier(id("order"))
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom, spacing: 0) {
@@ -232,5 +253,16 @@ struct IngredientRow: View {
     /// The amount as shown in the current oz/mL setting. Typing replaces it in that unit.
     private var amountBinding: Binding<String> {
         Binding(get: { store.displayAmount(line) }, set: { store.setLine(line.id, .amount, store.normalizeTyped($0)) })
+    }
+}
+
+extension LineMove {
+    var systemImage: String {
+        switch self {
+        case .top: return "arrow.up.to.line"
+        case .up: return "arrow.up"
+        case .down: return "arrow.down"
+        case .bottom: return "arrow.down.to.line"
+        }
     }
 }

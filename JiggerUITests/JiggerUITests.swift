@@ -193,6 +193,31 @@ final class JiggerUITests: XCTestCase {
         XCTAssertFalse(app.buttons["addFromLibrary"].isEnabled, "Add from My Ingredients still enabled at 25")
     }
 
+    func testMoveAnIngredientToTheTop() {
+        launch()
+        tap("row4.order")
+        let moveToTop = app.buttons["Move to top"].firstMatch
+        XCTAssertTrue(moveToTop.waitForExistence(timeout: 5), "move menu didn't open")
+        moveToTop.tap()
+        XCTAssertEqual(field("row0.name").value as? String, "Lime (garnish wheel)", "ingredient didn't move to the top")
+        XCTAssertEqual(text("drinkCost"), "$3.69", "reordering changed the cost")
+    }
+
+    func testReorderListOpensFromTheIngredientsHeader() {
+        launch()
+        tap("reorder")
+        XCTAssertTrue(element("reorder.0").waitForExistence(timeout: 5), "reorder list didn't open")
+        tap("reorderDone")
+        XCTAssertTrue(field("row0.name").waitForExistence(timeout: 5))
+    }
+
+    func testWasteForAllIngredientsIsVisibleAndApplies() {
+        launch()
+        type("recipeWaste", "10")
+        dismissKeyboard()
+        XCTAssertEqual(text("drinkCost"), "$4.10", "10% waste should divide the $3.69 cost by 0.9")
+    }
+
     /// iPad: sidebar navigation with the calculator and summary side by side.
     func testIPadShowsSidebarAndSummaryBesideTheCalculator() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad layout only")

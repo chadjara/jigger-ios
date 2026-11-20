@@ -8,7 +8,6 @@ struct SummaryCard: View {
     @Environment(AppStore.self) private var store
     let totals: RecipeTotals
     var focus: FocusState<FieldFocus?>.Binding
-    @State private var shareItem: SharedFile?
 
     var body: some View {
         let draft = store.draft
@@ -127,9 +126,6 @@ struct SummaryCard: View {
         .background(Theme.surface)
         .overlay(Rectangle().inset(by: 5).stroke(Theme.brass.opacity(0.35), lineWidth: Theme.hairline))
         .overlay(Rectangle().strokeBorder(Theme.line, lineWidth: Theme.hairline))
-        .sheet(item: $shareItem) { item in
-            ActivityView(items: [item.url]).ignoresSafeArea()
-        }
     }
 
     // MARK: - Pieces
@@ -220,19 +216,11 @@ struct SummaryCard: View {
 
     private func printSheet() {
         focus.wrappedValue = nil
-        let sheet = store.costSheet(for: store.draft)
-        if !CostSheetPrinter.print(sheet) {
-            store.showToast("Printing isn’t available on this device. Use Share PDF to save or send the cost sheet.")
-        }
+        PDFActions.print(store.costSheet(for: store.draft), store: store)
     }
 
     private func shareSheet() {
         focus.wrappedValue = nil
-        do {
-            let url = try CostSheetPDF.writeTemporaryFile(store.costSheet(for: store.draft))
-            shareItem = SharedFile(url: url)
-        } catch {
-            store.showToast("Couldn’t create the PDF. Please try again.")
-        }
+        PDFActions.share(store.costSheet(for: store.draft), store: store)
     }
 }

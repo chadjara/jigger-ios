@@ -288,34 +288,47 @@ struct EmptyStateView: View {
     }
 }
 
-/// Bottom message slip with optional Undo.
+/// A small notice that slides up above the bottom bar: a charcoal slip with a hairline brass edge,
+/// sized to its words. Tap or swipe it down to dismiss; Undo when the action can be reversed.
 struct ToastView: View {
     let message: String
     let canUndo: Bool
     let undo: () -> Void
+    let dismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            Rectangle().fill(Theme.brass).frame(width: 3)
-            HStack(spacing: 16) {
-                Text(message).font(Theme.subhead).fixedSize(horizontal: false, vertical: true)
-                if canUndo {
-                    Spacer(minLength: 0)
-                    Button(action: undo) {
-                        Text("Undo").font(Theme.futura(13, .bold, relativeTo: .subheadline)).tracking(1.3).textCase(.uppercase)
-                            .padding(.vertical, 6)
-                    }
-                    .accessibilityLabel("Undo")
-                    .accessibilityIdentifier("toastUndo")
+        HStack(spacing: 12) {
+            Text(message)
+                .font(Theme.footnote)
+                .foregroundStyle(Theme.text)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if canUndo {
+                Rectangle().fill(Theme.lineStrong).frame(width: Theme.hairline, height: 16)
+                    .accessibilityHidden(true)
+                Button(action: undo) {
+                    Text("Undo")
+                        .font(Theme.futura(12, .bold, relativeTo: .footnote))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.brass)
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Undo")
+                .accessibilityIdentifier("toastUndo")
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
         }
-        .foregroundStyle(Theme.bg)
-        .background(Theme.text)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.corner))
-        .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.corner))
+        .overlay(RoundedRectangle(cornerRadius: Theme.corner).strokeBorder(Theme.brass.opacity(0.35), lineWidth: Theme.hairline))
+        .shadow(color: .black.opacity(0.22), radius: 12, y: 4)
+        .frame(maxWidth: 360)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: dismiss)
+        .gesture(DragGesture(minimumDistance: 8).onEnded { if $0.translation.height > 10 { dismiss() } })
         .padding(.horizontal, Theme.gutter)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("toast")
