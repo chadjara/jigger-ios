@@ -38,20 +38,14 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Pick and prepare simulators (clean 9:41 status bar)
+      - name: Pick simulators
         run: |
-          IPHONE="$(.github/scripts/pick-simulator.sh "iPhone 17 Pro Max")"
-          IPAD="$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")"
-          echo "IPHONE_UDID=$IPHONE" >> "$GITHUB_ENV"
-          echo "IPAD_UDID=$IPAD" >> "$GITHUB_ENV"
-          for UDID in "$IPHONE" "$IPAD"; do
-            xcrun simctl boot "$UDID"
-            xcrun simctl bootstatus "$UDID" -b
-            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
-              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
-          done
+          echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh "iPhone 17 Pro Max")" >> "$GITHUB_ENV"
+          echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")" >> "$GITHUB_ENV"
 
       - name: Build for testing
+        # Build before booting anything (as CI does): booting the simulators first left xcodebuild
+        # unable to see any simulator ("Unable to find a device matching the provided destination").
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
@@ -60,6 +54,15 @@ jobs:
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             -quiet
+
+      - name: Boot simulators with a clean 9:41 status bar
+        run: |
+          for UDID in "$IPHONE_UDID" "$IPAD_UDID"; do
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          done
 
       - name: Capture screenshots
         env:
@@ -71,6 +74,7 @@ jobs:
             xcodebuild test-without-building \
               -project Jigger.xcodeproj -scheme Jigger \
               -destination "id=$UDID" \
+              -destination-timeout 180 \
               -derivedDataPath DerivedData \
               -resultBundlePath "results/$DEVICE.xcresult" \
               -only-testing:JiggerUITests/ScreenshotTests \
