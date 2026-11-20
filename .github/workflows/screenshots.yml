@@ -1,18 +1,30 @@
 # App Store screenshots, run by hand (Actions → Screenshots → Run workflow).
 # Captures the app with demo recipes on the 6.9" iPhone and 13" iPad simulators that
 # App Store Connect requires, and uploads the PNGs as a downloadable artifact.
+# With "upload" ticked, it also sends screenshots to the App Store version in App Store Connect:
+# the iPhone set from docs/app-store/screenshots/ and the iPad set captured here (or by the run
+# named in "ipad_from_run").
 name: Screenshots
 
 on:
   workflow_dispatch:
     inputs:
       devices:
-        description: "Devices to capture (iPhone, iPad or both)"
+        description: "Devices to capture (iPhone, iPad, both, or none)"
         default: "iPhone iPad"
+        required: false
+      upload:
+        description: "Upload to App Store Connect (replaces the screenshots already there)"
+        type: boolean
+        default: false
+      ipad_from_run:
+        description: "Use iPad screenshots from this earlier Screenshots run ID instead of capturing"
+        default: ""
         required: false
 
 permissions:
   contents: read
+  actions: read   # to fetch screenshots from an earlier run
 
 env:
   XCODE_VERSION: "26.6"
@@ -21,6 +33,7 @@ env:
 jobs:
   screenshots:
     name: Capture App Store screenshots
+    if: inputs.devices != 'none'
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -105,3 +118,50 @@ jobs:
           name: app-store-screenshots
           path: screenshots/
           retention-days: 30
+
+  upload:
+    name: Upload to App Store Connect
+    needs: screenshots
+    if: always() && inputs.upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Gather screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_RUN: ${{ inputs.ipad_from_run }}
+          CAPTURED: ${{ needs.screenshots.result != 'skipped' }}
+        run: |
+          mkdir -p upload artifact
+          cp docs/app-store/screenshots/*.png upload/ 2>/dev/null || true
+          RUN="$FROM_RUN"
+          if [ -z "$RUN" ] && [ "$CAPTURED" = "true" ]; then RUN="$GITHUB_RUN_ID"; fi
+          if [ -n "$RUN" ]; then
+            gh run download "$RUN" --repo "$GITHUB_REPOSITORY" --name app-store-screenshots --dir artifact
+            cp artifact/iPad-*.png upload/ 2>/dev/null || true
+          fi
+          ls -l upload
+
+      - name: Write App Store Connect key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_P8" ]; then echo "::error::The ASC_KEY_P8 secret is not set."; exit 1; fi
+          umask 077
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Upload screenshots
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
+          ruby .github/scripts/asc_screenshots.rb upload | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"

@@ -11,6 +11,7 @@ on:
     paths-ignore:
       - "**/*.md"
       - "reference/**"
+      - "docs/**"
       - "LICENSE"
   workflow_dispatch:
 
