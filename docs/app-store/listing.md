@@ -40,9 +40,10 @@ PRICE WITH CONFIDENCE
 • Enter your menu price to see beverage cost %, gross profit and gross margin
 • Scale any recipe to 10, 25, 100 or any number of drinks
 • Print or share a clean cost analysis PDF with an ingredient breakdown, your biggest cost driver, a price ladder at 18/20/22/25% and batch totals
+• Print your whole recipe book (specs, costs and pricing at a glance) and a bar price list with cost per ounce
 
 YOUR RECIPES, YOUR BOTTLES
-• Save recipes, then search, duplicate, and delete with undo
+• Save recipes, then search, duplicate, reorder ingredients, and delete with undo
 • My Ingredients: update a bottle's price once and every recipe that uses it recalculates
 • A custom price in one recipe is never overwritten
 • Back up and restore with a simple JSON file

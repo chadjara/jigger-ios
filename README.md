@@ -42,10 +42,14 @@ Everything builds in GitHub Actions; no Mac is needed.
 | Workflow | When | What |
 | --- | --- | --- |
 | `CI` | every pull request | `swift test` of JiggerKit on Linux (fast), then generate the project, build, and run all unit, engine, core and UI tests on an iPhone simulator, plus the iPad layout test |
-| `TestFlight` | every merge to `main` | archive a signed Release build and upload it to TestFlight; the build number is `<run number>.<attempt>` |
+| `TestFlight` | every merge to `main` | archive a signed Release build and upload it to TestFlight; the build number is the workflow's run number (3, 4, 5…) |
 | `Screenshots` | run by hand (Actions → Screenshots → Run workflow) | capture App Store screenshots with demo recipes on the 6.9" iPhone and 13" iPad simulators; download them from the `app-store-screenshots` artifact |
 
 Both workflows skip changes that only touch documentation or `reference/`.
+
+### Version numbers
+
+The version lives in `project.yml` (`MARKETING_VERSION`). Each release bumps only the last number (2.0.1, 2.0.2, …); the middle or first number changes only when the owner asks. TestFlight shows it with the build counter, e.g. "2.0.1 (3)".
 
 ### Signing setup (one time)
 

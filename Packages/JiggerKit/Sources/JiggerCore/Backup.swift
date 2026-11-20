@@ -71,7 +71,7 @@ extension AppStore {
             showToast(summary.message)
             return summary
         } catch {
-            showToast("That file isn’t a Jigger backup. Choose a .json file exported from Settings.")
+            showToast("That file isn’t a Jigger backup")
             return nil
         }
     }

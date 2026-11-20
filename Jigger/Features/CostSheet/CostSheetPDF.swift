@@ -66,18 +66,57 @@ enum CostSheetPrinter {
     }
 }
 
-struct SharedFile: Identifiable {
-    let url: URL
-    var id: String { url.path }
-}
-
-/// The system share sheet (Share, Save to Files, Print, AirDrop, Mail…).
-struct ActivityView: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+/// Print and share actions shared by every screen that offers a PDF.
+@MainActor
+enum PDFActions {
+    static func share(_ sheet: CostSheet, store: AppStore) {
+        do {
+            ActivityPresenter.present(try CostSheetPDF.writeTemporaryFile(sheet))
+        } catch {
+            store.showToast("Couldn’t create the PDF")
+        }
     }
 
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+    static func print(_ sheet: CostSheet, store: AppStore) {
+        if !CostSheetPrinter.print(sheet) { store.showToast("Printing isn’t available here") }
+    }
+}
+
+/// Toolbar button with Share PDF and Print. The document is built only when chosen.
+struct PDFExportMenu: View {
+    @Environment(AppStore.self) private var store
+    let identifier: String
+    var disabled = false
+    let makeSheet: () -> CostSheet
+
+    var body: some View {
+        Menu {
+            Button { PDFActions.share(makeSheet(), store: store) } label: { Label("Share PDF", systemImage: "square.and.arrow.up") }
+            Button { PDFActions.print(makeSheet(), store: store) } label: { Label("Print", systemImage: "printer") }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+        }
+        .disabled(disabled)
+        .accessibilityLabel("Print or share PDF")
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Presents the system share sheet (Share, Save to Files, Print, AirDrop, Mail…) from the frontmost screen.
+/// Presenting through UIKit works the same from toolbars, menus and sheets, and anchors correctly on iPad.
+@MainActor
+enum ActivityPresenter {
+    static func present(_ url: URL) {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first,
+              var top = scene.keyWindow?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = top.view
+            popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.minY + 64, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        top.present(controller, animated: true)
+    }
 }

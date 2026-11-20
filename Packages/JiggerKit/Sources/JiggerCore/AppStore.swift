@@ -149,7 +149,7 @@ public final class AppStore {
         } catch {
             if !warnedStorage {
                 warnedStorage = true
-                showToast("Couldn’t save your changes on this device. Export a backup in Settings to keep them safe.")
+                showToast("Couldn’t save on this device. Export a backup in Settings.")
             }
         }
     }

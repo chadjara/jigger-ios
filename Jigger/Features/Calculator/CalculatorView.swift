@@ -15,6 +15,7 @@ struct CalculatorView: View {
     @Environment(AppStore.self) private var store
     @FocusState private var focus: FieldFocus?
     @State private var showPicker = false
+    @State private var showReorder = false
 
     var body: some View {
         let totals = store.draftTotals
@@ -72,6 +73,7 @@ struct CalculatorView: View {
                 Button { focus = nil } label: { Text("Done").font(Theme.emphasis) }
             }
         }
+        .sheet(isPresented: $showReorder) { ReorderSheet() }
         .sheet(isPresented: $showPicker) {
             LibraryPicker { itemID in
                 showPicker = false
@@ -132,6 +134,15 @@ struct CalculatorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: 14) {
                     RuleHeader(title: "Ingredients", trailing: draft.lines.isEmpty ? nil : String(format: "%02d", draft.lines.count))
+                    if draft.lines.count > 1 {
+                        Button { focus = nil; showReorder = true } label: {
+                            Text("Reorder").font(Theme.futura(12, .bold, relativeTo: .footnote)).tracking(1.2).textCase(.uppercase)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.brass)
+                        .fixedSize()
+                        .accessibilityIdentifier("reorder")
+                    }
                     Picker("Pour unit", selection: Binding(get: { store.settings.displayUnit }, set: { store.setDisplayUnit($0) })) {
                         Text("oz").tag("floz")
                         Text("mL").tag("ml")
@@ -149,14 +160,17 @@ struct CalculatorView: View {
                         .padding(.vertical, Theme.rowSpacing)
                 }
                 ForEach(Array(draft.lines.enumerated()), id: \.element.id) { index, line in
-                    IngredientRow(line: line, index: index, totals: totals, focus: $focus)
+                    IngredientRow(line: line, index: index, totals: totals, focus: $focus) { showReorder = true }
                     Hairline()
                 }
             }
 
             addBar
 
-            AdditionalCostsSection(totals: totals, focus: $focus)
+            VStack(spacing: 0) {
+                WasteAllRow(focus: $focus)
+                AdditionalCostsSection(totals: totals, focus: $focus)
+            }
         }
     }
 

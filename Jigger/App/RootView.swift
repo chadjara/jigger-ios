@@ -86,20 +86,28 @@ struct RootView: View {
         }
     }
 
+    /// Sits just above the Mix cost bar on iPhone, above the tab bar elsewhere, and low on iPad.
+    private var toastBottomPadding: CGFloat {
+        if sizeClass == .regular { return 24 }
+        return section == .calculator ? 118 : 60
+    }
+
     @ViewBuilder
     private var toastOverlay: some View {
-        if let toast = store.toast {
-            ToastView(message: toast.message, canUndo: toast.undo != nil) {
-                store.undoToast()
-            }
-            .padding(.bottom, sizeClass == .regular ? 24 : 120)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .id(toast.id)
-            .task(id: toast.id) {
-                // Undo stays available longer than plain messages, like the web app.
-                try? await Task.sleep(for: .seconds(toast.undo == nil ? 3.5 : 7))
-                if store.toast?.id == toast.id { store.toast = nil }
+        ZStack {
+            if let toast = store.toast {
+                ToastView(message: toast.message, canUndo: toast.undo != nil,
+                          undo: { store.undoToast() }, dismiss: { store.toast = nil })
+                    .padding(.bottom, toastBottomPadding)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .id(toast.id)
+                    .task(id: toast.id) {
+                        // Long enough to read; a little longer when there's an Undo to reach for.
+                        try? await Task.sleep(for: .seconds(toast.undo == nil ? 2.5 : 5))
+                        if store.toast?.id == toast.id { store.toast = nil }
+                    }
             }
         }
+        .animation(.easeOut(duration: 0.22), value: store.toast?.id)
     }
 }

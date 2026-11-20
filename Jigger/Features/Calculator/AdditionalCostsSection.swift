@@ -2,7 +2,7 @@ import SwiftUI
 import JiggerCore
 import JiggerEngine
 
-/// Folded away by default: garnish, napkin, straw, cup, other prep, and the recipe-wide waste %.
+/// Folded away by default: garnish, napkin, straw, cup and other prep.
 struct AdditionalCostsSection: View {
     @Environment(AppStore.self) private var store
     let totals: RecipeTotals
@@ -50,19 +50,6 @@ struct AdditionalCostsSection: View {
                                    focus: focus, focusValue: .extra(extra.key))
                         }
                     }
-                    VStack(alignment: .leading, spacing: 8) {
-                        JField(label: "Waste & spillage", text: wasteBinding, placeholder: "0", suffix: "%",
-                               invalid: store.recipeWasteError(draft) != nil, identifier: "recipeWaste",
-                               focus: focus, focusValue: .recipeWaste)
-                            .frame(width: 130)
-                        if let err = store.recipeWasteError(draft) {
-                            Text(err).font(Theme.footnote).foregroundStyle(Theme.danger)
-                        }
-                        Text("The share of each bottle that never reaches a glass: spills, overpours, spoilage. At 10%, every pour costs its price ÷ 0.90. It applies to every ingredient without its own waste %.")
-                            .font(Theme.footnote)
-                            .foregroundStyle(Theme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
                 .padding(.bottom, 20)
                 .transition(.opacity)
@@ -73,9 +60,5 @@ struct AdditionalCostsSection: View {
 
     private func extraBinding(_ key: String) -> Binding<String> {
         Binding(get: { store.draft.extras[key] ?? "" }, set: { store.setExtra(key, store.normalizeTyped($0)) })
-    }
-
-    private var wasteBinding: Binding<String> {
-        Binding(get: { store.draft.wastePct }, set: { store.setRecipe(.wastePct, store.normalizeTyped($0)) })
     }
 }

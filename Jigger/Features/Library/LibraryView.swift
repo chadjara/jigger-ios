@@ -85,6 +85,9 @@ struct LibraryView: View {
         .onChange(of: query) { resort() }
         .onChange(of: store.library.count) { resort() }
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                PDFExportMenu(identifier: "ingredientsPDF", disabled: store.library.isEmpty) { store.ingredientPriceList() }
+            }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button { hideKeyboard() } label: { Text("Done").font(Theme.emphasis) }

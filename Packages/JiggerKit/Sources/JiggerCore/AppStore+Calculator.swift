@@ -11,6 +11,19 @@ public enum RecipeTextField: Sendable {
     case name, targetPct, menuPrice, servings, wastePct
 }
 
+public enum LineMove: Sendable, CaseIterable {
+    case top, up, down, bottom
+
+    public var label: String {
+        switch self {
+        case .top: return "Move to top"
+        case .up: return "Move up"
+        case .down: return "Move down"
+        case .bottom: return "Move to bottom"
+        }
+    }
+}
+
 public enum SaveToLibraryOutcome: Equatable, Sendable {
     case saved, needsName, needsPrice, needsSize
 }
@@ -131,22 +144,93 @@ extension AppStore {
     public func saveLineToLibrary(_ id: String) -> SaveToLibraryOutcome {
         guard let l = draft.lines.first(where: { $0.id == id }) else { return .needsName }
         let name = l.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { showToast("Name the ingredient before saving it."); return .needsName }
-        guard let p = parseNumber(l.price).value, p >= 0 else { showToast("Add a valid price before saving it."); return .needsPrice }
+        guard !name.isEmpty else { showToast("Name it first"); return .needsName }
+        guard let p = parseNumber(l.price).value, p >= 0 else { showToast("Add a price first"); return .needsPrice }
         guard let s = parseNumber(l.size).value, s > 0, dimension(of: l.sizeUnit) != nil else {
-            showToast("Add a valid package size before saving it."); return .needsSize
+            showToast("Add a package size first"); return .needsSize
+        }
+        // Never save the same ingredient twice: link this line to the one already saved instead.
+        if let existing = identicalLibraryItem(name: name, size: l.size, sizeUnit: l.sizeUnit) {
+            let samePrice = parseNumber(existing.price).value == p
+            mutateLine(id) { $0.libId = existing.id; $0.priceOverride = !samePrice }
+            showToast(samePrice ? "Already saved · linked" : "Already saved · linked with this recipe’s price")
+            return .saved
         }
         let t = now()
         let item = LibraryItem(id: makeID(), name: name, price: l.price, size: l.size, sizeUnit: l.sizeUnit, createdAt: t, updatedAt: t)
         state.library.append(item)
         mutateLine(id) { $0.libId = item.id; $0.priceOverride = false }
-        showToast("Saved \(name) to My Ingredients")
+        showToast("Saved to My Ingredients")
         return .saved
     }
 
     /// Drops a linked line's custom price so it follows My Ingredients again.
     public func revertPrice(_ id: String) {
         mutateLine(id) { $0.priceOverride = false; $0.price = "" }
+    }
+
+    // MARK: - Ordering
+
+    /// Moves one line to the top, bottom, or one place up or down.
+    public func moveLine(_ id: String, _ move: LineMove) {
+        guard let i = draft.lines.firstIndex(where: { $0.id == id }) else { return }
+        let last = draft.lines.count - 1
+        let target: Int
+        switch move {
+        case .top: target = 0
+        case .up: target = max(i - 1, 0)
+        case .down: target = min(i + 1, last)
+        case .bottom: target = last
+        }
+        guard target != i else { return }
+        mutateDraft { r in
+            let l = r.lines.remove(at: i)
+            r.lines.insert(l, at: target)
+        }
+    }
+
+    /// Drag-to-reorder: moves the lines at `source` so they land before the line now at `destination`
+    /// (the same contract as SwiftUI's `onMove`). Written out here so the package builds without SwiftUI.
+    public func moveLines(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let lines = draft.lines
+        guard !source.isEmpty, source.allSatisfy({ $0 >= 0 && $0 < lines.count }),
+              destination >= 0, destination <= lines.count else { return }
+        let moving = source.map { lines[$0] }
+        var kept: [Line] = []
+        for (i, l) in lines.enumerated() where !source.contains(i) { kept.append(l) }
+        let insertAt = destination - source.filter { $0 < destination }.count
+        kept.insert(contentsOf: moving, at: insertAt)
+        guard kept.map(\.id) != lines.map(\.id) else { return }
+        mutateDraft { $0.lines = kept }
+    }
+
+    /// Whether a line can move in a direction (for disabling menu items).
+    public func canMoveLine(_ id: String, _ move: LineMove) -> Bool {
+        guard let i = draft.lines.firstIndex(where: { $0.id == id }) else { return false }
+        switch move {
+        case .top, .up: return i > 0
+        case .down, .bottom: return i < draft.lines.count - 1
+        }
+    }
+
+    // MARK: - Waste for all ingredients
+
+    /// Lines that have their own waste % (and so ignore the recipe-wide one).
+    public var linesWithOwnWaste: Int {
+        draft.lines.filter { !$0.wastePct.trimmingCharacters(in: .whitespaces).isEmpty }.count
+    }
+
+    /// Clears every line's own waste % so the recipe-wide one applies to all of them. Undoable.
+    public func applyRecipeWasteToAll() {
+        let before = draft.lines
+        guard linesWithOwnWaste > 0 else { return }
+        mutateDraft { r in
+            for i in r.lines.indices { r.lines[i].wastePct = "" }
+        }
+        let pct = draft.wastePct.trimmingCharacters(in: .whitespaces)
+        showToast(pct.isEmpty ? "Line waste cleared" : "\(pct)% waste on every ingredient") { [weak self] in
+            self?.mutateDraft { $0.lines = before }
+        }
     }
 
     // MARK: - Recipe fields
@@ -200,7 +284,7 @@ extension AppStore {
         let copy = draft
         if let i = state.recipes.firstIndex(where: { $0.id == copy.id }) { state.recipes[i] = copy } else { state.recipes.append(copy) }
         flush()
-        showToast("Saved \(copy.name)")
+        showToast("Saved")
     }
 
     func replaceDraft(_ next: Recipe, message: String) {
@@ -209,8 +293,8 @@ extension AppStore {
         state.draft = next
         changed()
         if wasDirty && hasContent(prev) {
-            let name = prev.name.isEmpty ? "the previous drink" : prev.name
-            showToast("\(message). Unsaved changes to \(name) were set aside.") { [weak self] in
+            let name = prev.name.isEmpty ? "previous drink" : prev.name
+            showToast("\(message) · \(name) set aside") { [weak self] in
                 self?.state.draft = prev
                 self?.changed()
             }
@@ -242,7 +326,7 @@ extension AppStore {
         c.lines = r.lines.map { var l = $0; l.id = makeID(); return l }
         c.createdAt = now(); c.updatedAt = c.createdAt
         mutateState { $0.recipes.append(c) }
-        showToast("Duplicated as \(c.name)")
+        showToast("Duplicated")
     }
 
     public func deleteRecipe(_ id: String) {

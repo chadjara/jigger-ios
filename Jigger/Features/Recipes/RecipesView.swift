@@ -54,6 +54,9 @@ struct RecipesView: View {
         .navigationTitle("Saved Recipes")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                PDFExportMenu(identifier: "recipesPDF", disabled: store.recipes.isEmpty) { store.recipeBook() }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { store.startNewRecipe(); openCalculator() } label: { Text("New").font(Theme.body) }
                     .accessibilityLabel("New recipe")
                     .accessibilityIdentifier("newRecipeFromList")

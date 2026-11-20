@@ -190,6 +190,22 @@ final class EngineExtrasTests: XCTestCase {
         XCTAssertNil(biggestCostDriver(recipeTotals(RecipeInput())))
     }
 
+    func testUnitCostIsExactPerPourUnit() {
+        // $24.99 for 750 mL: 24.99 × 29.5735295625 / 750 per fl oz
+        let oz = unitCost(price: "24.99", size: "750", sizeUnit: "ml")!
+        XCTAssertEqual(oz.basis, .fluidOunce)
+        XCTAssertEqual(oz.amount, dec("24.99") * dec("29.5735295625") / 750)
+        XCTAssertEqual(fixed(oz.amount, places: 2), "0.99")
+        XCTAssertEqual(unitCost(price: "24.99", size: "750", sizeUnit: "ml", volumeDisplayUnit: "ml")?.basis, .tenMilliliters)
+        XCTAssertEqual(fixed(unitCost(price: "35", size: "1.75", sizeUnit: "l", volumeDisplayUnit: "ml")!.amount, places: 2), "0.20")
+        // 1 lb at $16 is exactly $1 per oz wt
+        XCTAssertEqual(unitCost(price: "16", size: "1", sizeUnit: "lb")?.amount, 1)
+        XCTAssertEqual(unitCost(price: "12", size: "40", sizeUnit: "each")?.amount, dec("0.3"))
+        XCTAssertNil(unitCost(price: "abc", size: "750", sizeUnit: "ml"))
+        XCTAssertNil(unitCost(price: "10", size: "0", sizeUnit: "ml"))
+        XCTAssertNil(unitCost(price: "10", size: "750", sizeUnit: "barrel"))
+    }
+
     func testParserEdgeCases() {
         XCTAssertEqual(parseNumber(nil), .blank)
         XCTAssertEqual(parseNumber("5."), .value(5))
