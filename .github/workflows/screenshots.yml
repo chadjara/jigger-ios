@@ -21,6 +21,10 @@ on:
         description: "With upload ticked: only list what App Store Connect has, change nothing"
         type: boolean
         default: false
+      check:
+        description: "Only check App Store Connect for anything missing before submission, change nothing"
+        type: boolean
+        default: false
       inspect:
         description: "Only list the Xcodes and simulators on the runner (looks for iPhone Duo), change nothing"
         type: boolean
@@ -60,7 +64,7 @@ jobs:
 
   screenshots:
     name: Capture App Store screenshots
-    if: inputs.devices != 'none' && !inputs.inspect
+    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -149,7 +153,7 @@ jobs:
   upload:
     name: Upload to App Store Connect
     needs: screenshots
-    if: always() && inputs.upload && !inputs.inspect
+    if: always() && (inputs.upload || inputs.check) && !inputs.inspect
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -187,7 +191,9 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
-          if [ "${{ inputs.list_only }}" = "true" ]; then
+          if [ "${{ inputs.check }}" = "true" ]; then
+            ruby .github/scripts/asc_check.rb | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ inputs.list_only }}" = "true" ]; then
             ruby .github/scripts/asc_screenshots.rb --list | tee -a "$GITHUB_STEP_SUMMARY"
           else
             ruby .github/scripts/asc_screenshots.rb upload | tee -a "$GITHUB_STEP_SUMMARY"
