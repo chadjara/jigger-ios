@@ -1,9 +1,13 @@
-# Every pull request: formula/state tests on Linux (cheap), then build and run all unit and UI tests
-# on iOS simulators (iPhone: everything; iPad: the sidebar layout test).
+# Pull requests: formula/state tests on Linux (cheap), then an iOS simulator build.
+# macOS minutes are billed at 10x on a private repo, so the simulator work depends on the PR:
+#   draft PR (quick path):  build + app unit tests (PDF, theme, backup) on iPhone.
+#   ready for review / manual run (full gate before merge):  every unit, engine, core and UI test
+#   on iPhone, plus the iPad sidebar layout test.
 name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - "**/*.md"
       - "reference/**"
@@ -35,7 +39,9 @@ jobs:
   ios:
     name: iOS build & tests (simulator)
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    env:
+      FULL: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@v6
 
@@ -59,7 +65,9 @@ jobs:
       - name: Pick simulators
         run: |
           echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh iPhone)" >> "$GITHUB_ENV"
-          echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh iPad)" >> "$GITHUB_ENV"
+          if [ "$FULL" = "true" ]; then
+            echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh iPad)" >> "$GITHUB_ENV"
+          fi
 
       - name: Build for testing
         run: |
@@ -71,7 +79,21 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
+      - name: Quick tests on iPhone simulator (app unit tests; draft PR)
+        if: env.FULL != 'true'
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$IPHONE_UDID" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath results/iPhone.xcresult \
+            -only-testing:JiggerTests \
+            -parallel-testing-enabled NO \
+            -quiet
+
       - name: Test on iPhone simulator (unit, engine, core and UI tests)
+        if: env.FULL == 'true'
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -83,6 +105,7 @@ jobs:
             -quiet
 
       - name: Test on iPad simulator (sidebar layout)
+        if: env.FULL == 'true'
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -98,7 +121,11 @@ jobs:
         if: always()
         run: |
           .github/scripts/test-summary.sh "iPhone" results/iPhone.xcresult
-          .github/scripts/test-summary.sh "iPad" results/iPad.xcresult
+          if [ "$FULL" = "true" ]; then
+            .github/scripts/test-summary.sh "iPad" results/iPad.xcresult
+          else
+            echo "### Draft PR: quick path (UI and iPad tests run once the PR is marked ready for review)" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload test results
         if: failure()
