@@ -141,8 +141,8 @@ end
 
 review = get("/v1/appStoreVersions/#{version['id']}/appStoreReviewDetail")&.dig("data", "attributes")
 if review
-  %w[contactFirstName contactLastName contactPhone contactEmail].each do |f|
-    label = f.sub("contact", "Review contact ").gsub(/([A-Z])/) { " #{$1.downcase}" }.squeeze(" ")
+  { "contactFirstName" => "Review contact first name", "contactLastName" => "Review contact last name",
+    "contactPhone" => "Review contact phone", "contactEmail" => "Review contact email" }.each do |f, label|
     check(present?(review[f]), label, "set", "version page → App Review Information → #{label}")
   end
   check(review["demoAccountRequired"] != true, "Sign-in required", "off", "turn off 'Sign-in required' (the app has no accounts)")

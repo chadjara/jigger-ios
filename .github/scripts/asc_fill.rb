@@ -126,13 +126,15 @@ step("Availability") do
     next "already set"
   end
   excluded = META.fetch("excludeTerritories", [])
-  territories = api(:get, "/v1/territories", nil, { "limit" => "200" })["data"].map { |t| t["id"] } - excluded
+  # Apple wants every territory listed; the excluded ones are sent as unavailable.
+  all = api(:get, "/v1/territories", nil, { "limit" => "200" })["data"].map { |t| t["id"] }
+  territories = all - excluded
   api(:post, "/v2/appAvailabilities", {
     data: { type: "appAvailabilities", attributes: { availableInNewTerritories: true }, relationships: {
       app: { data: { type: "apps", id: app["id"] } },
-      territoryAvailabilities: { data: territories.map { |t| { type: "territoryAvailabilities", id: "${#{t}}" } } } } },
-    included: territories.map { |t| { type: "territoryAvailabilities", id: "${#{t}}", attributes: { available: true },
-                                      relationships: { territory: { data: { type: "territories", id: t } } } } } })
+      territoryAvailabilities: { data: all.map { |t| { type: "territoryAvailabilities", id: "${#{t}}" } } } } },
+    included: all.map { |t| { type: "territoryAvailabilities", id: "${#{t}}", attributes: { available: !excluded.include?(t) },
+                              relationships: { territory: { data: { type: "territories", id: t } } } } } })
   "#{territories.size} countries and regions#{excluded.empty? ? '' : " (not #{excluded.join(', ')})"}"
 end
 
