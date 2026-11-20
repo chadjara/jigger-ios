@@ -17,9 +17,14 @@ final class ScreenshotTests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-uitesting", "-reset", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launchEnvironment["JIGGER_SEED"] = DemoData.backup
-        if isPad { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
         XCTAssertTrue(element("recipeName").waitForExistence(timeout: 20))
+        // Rotate after launch (set before launch, the simulator reverted to portrait),
+        // so the iPad sidebar is on screen.
+        if isPad {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            sleep(2)
+        }
 
         // Save the Margarita so the "illustrative prices" banner and toast are gone.
         element("saveRecipe").tap()
@@ -29,9 +34,9 @@ final class ScreenshotTests: XCTestCase {
             snap("\(device)-01-calculator")
             element("servings.25").tap()
             snap("\(device)-02-batch")
-            element("sidebar.recipes").tap()
+            openSidebarItem("sidebar.recipes")
             snap("\(device)-03-recipes")
-            element("sidebar.ingredients").tap()
+            openSidebarItem("sidebar.ingredients")
             snap("\(device)-04-ingredients")
         } else {
             snap("\(device)-01-calculator")
@@ -50,6 +55,17 @@ final class ScreenshotTests: XCTestCase {
         let e = app.descendants(matching: .any)[id].firstMatch
         XCTAssertTrue(e.waitForExistence(timeout: 10), "\(id) not found")
         return e
+    }
+
+    /// Taps a sidebar entry, revealing the sidebar first if it is collapsed.
+    private func openSidebarItem(_ id: String) {
+        let item = element(id)
+        if !item.isHittable {
+            let toggle = app.buttons["ToggleSidebar"].exists ? app.buttons["ToggleSidebar"] : app.buttons["Show Sidebar"]
+            if toggle.exists { toggle.tap() }
+            _ = item.waitForExistence(timeout: 5)
+        }
+        item.tap()
     }
 
     private func waitForToastToClear() {
