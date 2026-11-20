@@ -49,7 +49,7 @@ Both workflows skip changes that only touch documentation or `reference/`.
 
 ### Version numbers
 
-The version lives in `project.yml` (`MARKETING_VERSION`). Each release bumps only the last number (2.0.1, 2.0.2, …); the middle or first number changes only when the owner asks. TestFlight shows it with the build counter, e.g. "2.0.1 (3)".
+The version lives in `project.yml` (`MARKETING_VERSION`). Each release bumps only the last number (1.0.1, 1.0.2, …); the middle or first number changes only when the owner asks. TestFlight shows it with the build counter, e.g. "1.0.1 (4)".
 
 ### Signing setup (one time)
 
