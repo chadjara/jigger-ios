@@ -65,7 +65,36 @@ def png_size(path)
   header[16, 8].unpack("NN")
 end
 
-folder = ARGV.fetch(0) { fail_with("usage: asc_screenshots.rb <folder>") }
+def find_localization
+  app = api(:get, "/v1/apps", nil, { "filter[bundleId]" => BUNDLE_ID })["data"].first
+  fail_with("No App Store Connect app uses #{BUNDLE_ID}") unless app
+  versions = api(:get, "/v1/apps/#{app['id']}/appStoreVersions", nil, { "filter[platform]" => "IOS", "limit" => "20" })["data"]
+  version = versions.find { |v| EDITABLE.include?(v.dig("attributes", "appStoreState")) }
+  fail_with("No editable iOS App Store version (states: #{versions.map { |v| v.dig('attributes', 'appStoreState') }.join(', ')})") unless version
+  puts "App Store version #{version.dig('attributes', 'versionString')} (#{version.dig('attributes', 'appStoreState')})"
+  locs = api(:get, "/v1/appStoreVersions/#{version['id']}/appStoreVersionLocalizations")["data"]
+  loc = locs.find { |l| l.dig("attributes", "locale") == "en-US" } || locs.first
+  fail_with("The App Store version has no localization yet") unless loc
+  puts "Localization #{loc.dig('attributes', 'locale')}"
+  [version, loc]
+end
+
+# "--list": print every screenshot set and its files, change nothing.
+if ARGV.first == "--list"
+  _, loc = find_localization
+  api(:get, "/v1/appStoreVersionLocalizations/#{loc['id']}/appScreenshotSets")["data"].each do |set|
+    shots = api(:get, "/v1/appScreenshotSets/#{set['id']}/appScreenshots")["data"]
+    puts "#{set.dig('attributes', 'screenshotDisplayType')}: #{shots.size} screenshot(s)"
+    shots.each do |shot|
+      a = shot["attributes"]
+      size = a.dig("imageAsset") ? "#{a.dig('imageAsset', 'width')} x #{a.dig('imageAsset', 'height')}" : "?"
+      puts "  #{a['fileName']}  #{size}  #{a.dig('assetDeliveryState', 'state')}"
+    end
+  end
+  exit 0
+end
+
+folder = ARGV.fetch(0) { fail_with("usage: asc_screenshots.rb <folder> | --list") }
 files = Dir[File.join(folder, "*.png")].sort
 groups = SETS.keys.to_h { |device| [device, files.select { |f| File.basename(f).start_with?("#{device}-") }] }
 groups.reject! { |_, list| list.empty? }
@@ -81,18 +110,7 @@ groups.each do |device, list|
   end
 end
 
-app = api(:get, "/v1/apps", nil, { "filter[bundleId]" => BUNDLE_ID })["data"].first
-fail_with("No App Store Connect app uses #{BUNDLE_ID}") unless app
-
-versions = api(:get, "/v1/apps/#{app['id']}/appStoreVersions", nil, { "filter[platform]" => "IOS", "limit" => "20" })["data"]
-version = versions.find { |v| EDITABLE.include?(v.dig("attributes", "appStoreState")) }
-fail_with("No editable iOS App Store version (states: #{versions.map { |v| v.dig('attributes', 'appStoreState') }.join(', ')})") unless version
-puts "App Store version #{version.dig('attributes', 'versionString')} (#{version.dig('attributes', 'appStoreState')})"
-
-locs = api(:get, "/v1/appStoreVersions/#{version['id']}/appStoreVersionLocalizations")["data"]
-loc = locs.find { |l| l.dig("attributes", "locale") == "en-US" } || locs.first
-fail_with("The App Store version has no localization yet") unless loc
-puts "Localization #{loc.dig('attributes', 'locale')}"
+version, loc = find_localization
 
 existing_sets = api(:get, "/v1/appStoreVersionLocalizations/#{loc['id']}/appScreenshotSets")["data"]
 

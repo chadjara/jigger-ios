@@ -17,6 +17,10 @@ on:
         description: "Upload to App Store Connect (replaces the screenshots already there)"
         type: boolean
         default: false
+      list_only:
+        description: "With upload ticked: only list what App Store Connect has, change nothing"
+        type: boolean
+        default: false
       ipad_from_run:
         description: "Use iPad screenshots from this earlier Screenshots run ID instead of capturing"
         default: ""
@@ -160,7 +164,11 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
-          ruby .github/scripts/asc_screenshots.rb upload | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.list_only }}" = "true" ]; then
+            ruby .github/scripts/asc_screenshots.rb --list | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            ruby .github/scripts/asc_screenshots.rb upload | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Remove signing key
         if: always()
