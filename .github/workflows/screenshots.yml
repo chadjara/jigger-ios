@@ -5,6 +5,11 @@ name: Screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      devices:
+        description: "Devices to capture (iPhone, iPad or both)"
+        default: "iPhone iPad"
+        required: false
 
 permissions:
   contents: read
@@ -67,11 +72,12 @@ jobs:
       - name: Capture screenshots
         env:
           TEST_RUNNER_JIGGER_SCREENSHOTS: "1"
+          DEVICES: ${{ inputs.devices || 'iPhone iPad' }}
         run: |
-          set -o pipefail
-          for DEVICE in iPhone iPad; do
+          status=0
+          for DEVICE in $DEVICES; do
             if [ "$DEVICE" = iPhone ]; then UDID="$IPHONE_UDID"; else UDID="$IPAD_UDID"; fi
-            xcodebuild test-without-building \
+            if ! xcodebuild test-without-building \
               -project Jigger.xcodeproj -scheme Jigger \
               -destination "id=$UDID" \
               -destination-timeout 180 \
@@ -79,12 +85,21 @@ jobs:
               -resultBundlePath "results/$DEVICE.xcresult" \
               -only-testing:JiggerUITests/ScreenshotTests \
               -parallel-testing-enabled NO \
-              -quiet
-            xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE"
-            python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY"
+              -quiet; then
+              status=1
+            fi
+            # Failure reasons go to the run summary (xcodebuild -quiet hides them from the log).
+            .github/scripts/test-summary.sh "$DEVICE screenshots" "results/$DEVICE.xcresult"
+            # Whatever was captured is kept, even if a later step of the test failed.
+            if [ -d "results/$DEVICE.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE" || true
+              python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY" || true
+            fi
           done
+          exit $status
 
       - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: app-store-screenshots
