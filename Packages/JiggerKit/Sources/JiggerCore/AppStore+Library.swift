@@ -131,7 +131,7 @@ extension AppStore {
     /// Sets the default target % for new recipes. Returns false (and keeps the old value) when invalid.
     @discardableResult
     public func setDefaultTarget(_ value: String) -> Bool {
-        guard let p = parseNumber(value).value, p > 0, p <= 100 else { return false }
+        guard parseNumber(value).value != nil, checkTargetPct(value).error == nil else { return false }
         mutateState { $0.settings.targetPct = value.trimmingCharacters(in: .whitespacesAndNewlines) }
         return true
     }
