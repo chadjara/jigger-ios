@@ -1,5 +1,6 @@
 import SwiftUI
 import JiggerCore
+import JiggerEngine
 
 /// One waste % for the whole recipe, set once instead of on every ingredient.
 /// Ingredients with their own % keep it; a one-tap action brings them all in line.
@@ -29,8 +30,9 @@ struct WasteAllRow: View {
                        spokenLabel: "Waste percent for all ingredients")
                     .frame(width: 84)
             }
-            if let error {
-                Text(error).font(Theme.footnote).foregroundStyle(Theme.danger)
+            FieldMessage(text: error, identifier: "recipeWasteError")
+            if error == nil, let w = parseNumber(draft.wastePct).value, w > 50 {
+                FieldMessage(text: "Over 50% waste is unusual. Check the waste %.", kind: .warning)
             }
             if own > 0 {
                 HStack(alignment: .center, spacing: 12) {

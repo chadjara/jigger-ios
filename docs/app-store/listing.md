@@ -61,9 +61,9 @@ cocktail,bar,pour,beverage,liquor,bartender,menu,price,recipe,margin,calculator,
 
 | Field | Value |
 | --- | --- |
-| Support URL (required) | A page where people can reach you, for example a contact page on your Jigger website |
+| Support URL (required) | https://cjaratech.com/contact.html |
 | Marketing URL (optional) | Your Jigger website |
-| Privacy Policy URL (required) | Wherever you publish `privacy-policy.md` (see that file) |
+| Privacy Policy URL (required) | https://cjaratech.com/jigger-cost/privacy |
 
 ## App Privacy (questionnaire)
 
@@ -79,7 +79,7 @@ Answer the questionnaire honestly. The relevant item is **Alcohol, Tobacco, or D
 - **Sign-in required:** No.
 - **Notes for the reviewer:**
 
-  > Jigger Cost is a drink cost calculator for bars and restaurants. No account or network connection is needed. On first launch, a Classic Margarita example with illustrative prices shows the calculator. Tap "Clear example" to start a new drink. Saved recipes, My Ingredients and Settings are in the tab bar (sidebar on iPad). "Share PDF" in the cost summary creates the cost analysis sheet.
+  > Jigger Cost is a drink cost calculator for bars and restaurants. No account or network connection is needed. On first launch the Mix tab shows a Classic Margarita example with illustrative prices; tap "Clear example" to start a new drink. Saved Recipes, My Ingredients and Settings are in the tab bar (sidebar on iPad). The share button in the cost summary creates a cost analysis PDF; Saved Recipes and My Ingredients each have a share button for a recipe book and a price list PDF.
 
 ## Screenshots
 

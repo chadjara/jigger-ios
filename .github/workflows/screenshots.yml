@@ -1,22 +1,72 @@
 # App Store screenshots, run by hand (Actions → Screenshots → Run workflow).
 # Captures the app with demo recipes on the 6.9" iPhone and 13" iPad simulators that
 # App Store Connect requires, and uploads the PNGs as a downloadable artifact.
+# With "upload" ticked, it also sends screenshots to the App Store version in App Store Connect:
+# the iPhone set from docs/app-store/screenshots/ and the iPad set captured here (or by the run
+# named in "ipad_from_run").
 name: Screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      devices:
+        description: "Devices to capture (iPhone, iPad, both, or none)"
+        default: "iPhone iPad"
+        required: false
+      upload:
+        description: "Upload to App Store Connect (replaces the screenshots already there)"
+        type: boolean
+        default: false
+      list_only:
+        description: "With upload ticked: only list what App Store Connect has, change nothing"
+        type: boolean
+        default: false
+      fill:
+        description: "Fill in App Store Connect from docs/app-store/metadata.json (not your contact details), then check"
+        type: boolean
+        default: false
+      check:
+        description: "Only check App Store Connect for anything missing before submission, change nothing"
+        type: boolean
+        default: false
+      inspect:
+        description: "Only list the Xcodes and simulators on the runner (looks for iPhone Duo), change nothing"
+        type: boolean
+        default: false
+      ipad_from_run:
+        description: "Use iPad screenshots from this earlier Screenshots run ID instead of capturing"
+        default: ""
+        required: false
 
 permissions:
   contents: read
+  actions: read   # to fetch screenshots from an earlier run
 
 env:
-  XCODE_VERSION: "26.6"
+  XCODE_VERSION: "27.1"   # iOS 27.1 SDK: runs full screen on iPhone Duo
   XCODEGEN_VERSION: "2.47.0"
 
 jobs:
+  inspect:
+    name: List Xcodes and simulators
+    if: inputs.inspect
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - name: Xcodes, simulator runtimes and device types
+        run: |
+          echo "== Xcodes =="; ls -d /Applications/Xcode*.app
+          X="$(ls -d /Applications/Xcode_27.1*.app 2>/dev/null | sort -V | tail -1)"
+          echo "== Selecting $X =="; sudo xcode-select -s "$X"; xcodebuild -version
+          echo "== Runtimes =="; xcrun simctl list runtimes
+          echo "== Device types =="; xcrun simctl list devicetypes | grep -iE "iphone|ipad"
+          echo "== Available iPhone/iPad devices (newest runtime) =="; xcrun simctl list devices available | grep -iE "iphone|ipad|-- iOS" | tail -40
+          echo "== simctl help mentioning fold/display/posture =="; xcrun simctl help 2>&1 | grep -iE "fold|display|posture|hinge|screen" || echo "(none)"
+
   screenshots:
     name: Capture App Store screenshots
-    runs-on: macos-latest
+    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill
+    runs-on: xcode-27
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
@@ -38,20 +88,14 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Pick and prepare simulators (clean 9:41 status bar)
+      - name: Pick simulators
         run: |
-          IPHONE="$(.github/scripts/pick-simulator.sh "iPhone 17 Pro Max")"
-          IPAD="$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")"
-          echo "IPHONE_UDID=$IPHONE" >> "$GITHUB_ENV"
-          echo "IPAD_UDID=$IPAD" >> "$GITHUB_ENV"
-          for UDID in "$IPHONE" "$IPAD"; do
-            xcrun simctl boot "$UDID"
-            xcrun simctl bootstatus "$UDID" -b
-            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
-              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
-          done
+          echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh "iPhone 18 Pro Max")" >> "$GITHUB_ENV"
+          echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")" >> "$GITHUB_ENV"
 
       - name: Build for testing
+        # Build before booting anything (as CI does): booting the simulators first left xcodebuild
+        # unable to see any simulator ("Unable to find a device matching the provided destination").
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
@@ -61,28 +105,106 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
+      - name: Boot simulators with a clean 9:41 status bar
+        run: |
+          for UDID in "$IPHONE_UDID" "$IPAD_UDID"; do
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          done
+
       - name: Capture screenshots
         env:
           TEST_RUNNER_JIGGER_SCREENSHOTS: "1"
+          DEVICES: ${{ inputs.devices || 'iPhone iPad' }}
         run: |
-          set -o pipefail
-          for DEVICE in iPhone iPad; do
+          status=0
+          for DEVICE in $DEVICES; do
             if [ "$DEVICE" = iPhone ]; then UDID="$IPHONE_UDID"; else UDID="$IPAD_UDID"; fi
-            xcodebuild test-without-building \
+            if ! xcodebuild test-without-building \
               -project Jigger.xcodeproj -scheme Jigger \
               -destination "id=$UDID" \
+              -destination-timeout 180 \
               -derivedDataPath DerivedData \
               -resultBundlePath "results/$DEVICE.xcresult" \
               -only-testing:JiggerUITests/ScreenshotTests \
               -parallel-testing-enabled NO \
-              -quiet
-            xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE"
-            python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY"
+              -quiet; then
+              status=1
+            fi
+            # Failure reasons go to the run summary (xcodebuild -quiet hides them from the log).
+            .github/scripts/test-summary.sh "$DEVICE screenshots" "results/$DEVICE.xcresult"
+            # Whatever was captured is kept, even if a later step of the test failed.
+            if [ -d "results/$DEVICE.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE" || true
+              python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY" || true
+            fi
           done
+          exit $status
 
       - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: app-store-screenshots
           path: screenshots/
           retention-days: 30
+
+  upload:
+    name: Upload to App Store Connect
+    needs: screenshots
+    if: always() && (inputs.upload || inputs.check || inputs.fill) && !inputs.inspect
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Gather screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_RUN: ${{ inputs.ipad_from_run }}
+          CAPTURED: ${{ needs.screenshots.result != 'skipped' }}
+        run: |
+          mkdir -p upload artifact
+          cp docs/app-store/screenshots/*.png upload/ 2>/dev/null || true
+          RUN="$FROM_RUN"
+          if [ -z "$RUN" ] && [ "$CAPTURED" = "true" ]; then RUN="$GITHUB_RUN_ID"; fi
+          if [ -n "$RUN" ]; then
+            gh run download "$RUN" --repo "$GITHUB_REPOSITORY" --name app-store-screenshots --dir artifact
+            cp artifact/iPad-*.png upload/ 2>/dev/null || true
+          fi
+          ls -l upload
+
+      - name: Write App Store Connect key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_P8" ]; then echo "::error::The ASC_KEY_P8 secret is not set."; exit 1; fi
+          umask 077
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Upload screenshots
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
+          if [ "${{ inputs.fill }}" = "true" ]; then
+            status=0
+            ruby .github/scripts/asc_fill.rb | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+            ruby .github/scripts/asc_check.rb | tee -a "$GITHUB_STEP_SUMMARY"
+            exit $status
+          elif [ "${{ inputs.check }}" = "true" ]; then
+            ruby .github/scripts/asc_check.rb | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ inputs.list_only }}" = "true" ]; then
+            ruby .github/scripts/asc_screenshots.rb --list | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            ruby .github/scripts/asc_screenshots.rb upload | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"

@@ -136,8 +136,22 @@ extension AppStore {
     /// Rewrites a locale's decimal comma as a point, so "24,99" typed on a European keyboard means 24.99.
     /// Leaves input alone in locales that use a decimal point (where commas are thousands separators).
     public func normalizeTyped(_ value: String) -> String {
-        normalizeDecimalInput(value, decimalSeparator: locale.decimalSeparator ?? ".")
+        sanitizeNumericInput(value, decimalSeparator: locale.decimalSeparator ?? ".", allowFraction: false)
     }
+
+    /// Like `normalizeTyped`, but keeps "/" and spaces so pours like "1 1/2" can be typed.
+    public func normalizePour(_ value: String) -> String {
+        sanitizeNumericInput(value, decimalSeparator: locale.decimalSeparator ?? ".", allowFraction: true)
+    }
+}
+
+/// Cleans what's typed or pasted into a number field: a comma decimal becomes a dot (in comma-decimal
+/// locales), and anything that can't be part of a number (letters, currency signs, emoji) is dropped.
+/// Pours may also keep "/" and spaces for fractions.
+public func sanitizeNumericInput(_ value: String, decimalSeparator: String, allowFraction: Bool) -> String {
+    let normalized = normalizeDecimalInput(value, decimalSeparator: decimalSeparator)
+    let allowed = Set("0123456789.," + (allowFraction ? "/ " : ""))
+    return String(normalized.filter { allowed.contains($0) })
 }
 
 /// See `AppStore.normalizeTyped`.
