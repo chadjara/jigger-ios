@@ -109,8 +109,8 @@ struct RootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .id(toast.id)
                     .task(id: toast.id) {
-                        // Long enough to read; a little longer when there's an Undo to reach for.
-                        try? await Task.sleep(for: .seconds(toast.undo == nil ? 2.5 : 5))
+                        // Long enough to read; longer when there's an Undo to reach for (also kinder to VoiceOver users).
+                        try? await Task.sleep(for: .seconds(toast.undo == nil ? 2.5 : 8))
                         if store.toast?.id == toast.id { store.toast = nil }
                     }
             }

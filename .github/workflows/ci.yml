@@ -132,7 +132,8 @@ jobs:
             -only-testing:JiggerUITests/JiggerUITests/testAppFillsTheScreenAndTheKeyboardLinesUp \
             -only-testing:JiggerUITests/JiggerUITests/testFirstLaunchShowsTheMargaritaExampleWithCorrectTotals \
             -only-testing:JiggerUITests/JiggerUITests/testNumberFieldsUseANumberKeyboard \
-            -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanAlwaysBeClosed \
+            -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnMix \
+            -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnSettings \
             -parallel-testing-enabled NO \
             -quiet
 

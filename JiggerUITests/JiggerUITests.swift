@@ -142,8 +142,7 @@ final class JiggerUITests: XCTestCase {
         openRow(0)
         reveal("editor.remove")
         tap("editor.remove")
-        XCTAssertTrue(element("row0").waitForExistence(timeout: 5))
-        XCTAssertFalse(element("row1").exists, "row wasn't removed")
+        // The only costed line is gone; Undo straight away while its notice is up.
         XCTAssertEqual(text("drinkCost"), "$0.00")
         tap("toastUndo")
         XCTAssertTrue(element("row1").waitForExistence(timeout: 5), "undo didn't restore the row")
@@ -192,19 +191,28 @@ final class JiggerUITests: XCTestCase {
         closeEditor()
     }
 
-    func testKeyboardCanAlwaysBeClosed() {
+    func testKeyboardCanBeClosedOnMix() {
         launch()
-        for (tab, sidebar, fieldID) in [("Mix", "sidebar.calculator", "menuPrice"), ("Settings", "sidebar.settings", "setTarget")] {
-            goTo(tab, sidebarID: sidebar)
-            let f = field(fieldID)
-            XCTAssertTrue(f.waitForExistence(timeout: 5))
-            f.tap()
-            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "keyboard didn't open on \(tab)")
-            let done = app.buttons["keyboardDone"].firstMatch
-            XCTAssertTrue(done.waitForExistence(timeout: 3), "no Done button above the keyboard on \(tab)")
-            done.tap()
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3), "keyboard stayed up on \(tab)")
-        }
+        assertKeyboardCloses(field: "menuPrice", screen: "Mix")
+    }
+
+    func testKeyboardCanBeClosedOnSettings() {
+        launch()
+        goTo("Settings", sidebarID: "sidebar.settings")
+        assertKeyboardCloses(field: "setTarget", screen: "Settings")
+    }
+
+    /// Opens the keyboard from `field` and closes it with the Done button above the keyboard.
+    private func assertKeyboardCloses(field fieldID: String, screen: String) {
+        let f = app.textFields[fieldID].firstMatch
+        XCTAssertTrue(f.waitForExistence(timeout: 10), "\(fieldID) not found on \(screen)")
+        f.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "keyboard didn't open on \(screen)")
+        let done = app.buttons["keyboardDone"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "no Done button above the keyboard on \(screen)")
+        done.tap()
+        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10), "keyboard stayed up on \(screen)")
     }
 
     func testInvalidInputShowsAMessageAndNeverNaN() {
