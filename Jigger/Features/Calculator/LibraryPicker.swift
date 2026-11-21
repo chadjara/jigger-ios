@@ -13,7 +13,7 @@ struct LibraryPicker: View {
             let items = store.filteredLibrary(query)
             List {
                 if store.library.isEmpty {
-                    Text("Nothing saved yet. Tap the bookmark on any ingredient to save it here, or add one under My Ingredients.")
+                    Text("Nothing saved yet. Open any ingredient in Mix and tap Save to My Ingredients, or add one under My Ingredients.")
                         .font(Theme.callout)
                         .foregroundStyle(Theme.muted)
                 } else if items.isEmpty {
@@ -38,6 +38,7 @@ struct LibraryPicker: View {
             .listStyle(.plain)
             .font(Theme.body)
             .searchable(text: $query, prompt: "Search saved ingredients")
+            .keyboardDoneBar()
             .navigationTitle("My Ingredients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

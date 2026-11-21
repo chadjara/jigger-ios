@@ -117,4 +117,16 @@ final class ValidationAndInputTests: XCTestCase {
         XCTAssertEqual(s.draft.lines[1].name, "Gin")
         XCTAssertNotEqual(copy, first)
     }
+
+    func testLibraryEditorMessages() {
+        let s = makeStore()
+        let empty = s.libraryFieldMessages(name: " ", price: "", size: "0", sizeUnit: "ml")
+        XCTAssertEqual(empty[.name], "Enter a name")
+        XCTAssertEqual(empty[.price], "Enter the price you pay")
+        XCTAssertEqual(empty[.size], "Size must be more than 0")
+        XCTAssertTrue(s.addLibraryItem(name: "Campari", price: "29.99", size: "750", sizeUnit: .ml))
+        XCTAssertEqual(s.libraryFieldMessages(name: "campari ", price: "30", size: "750", sizeUnit: "ml")[.name],
+                       "Already in My Ingredients with this package size")
+        XCTAssertTrue(s.libraryFieldMessages(name: "Campari", price: "30", size: "1", sizeUnit: "l").isEmpty)
+    }
 }

@@ -50,6 +50,8 @@ struct AdditionalCostsSection: View {
                                    focus: focus, focusValue: .extra(extra.key))
                         }
                     }
+                    FieldMessage(text: totals.extrasErrors.isEmpty ? nil : "Enter amounts like 0.10 (or leave a field empty).",
+                                 identifier: "extrasError")
                 }
                 .padding(.bottom, 20)
                 .transition(.opacity)

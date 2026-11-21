@@ -5,7 +5,6 @@ import JiggerEngine
 /// Which input has keyboard focus in the calculator.
 enum FieldFocus: Hashable {
     case recipeName
-    case line(String, LineTextField)
     case target, menuPrice, servings, recipeWaste
     case extra(String)
 }
@@ -16,6 +15,8 @@ struct CalculatorView: View {
     @FocusState private var focus: FieldFocus?
     @State private var showPicker = false
     @State private var showReorder = false
+    /// The ingredient open in the editor sheet.
+    @State private var editing: EditorTarget?
 
     var body: some View {
         let totals = store.draftTotals
@@ -23,7 +24,7 @@ struct CalculatorView: View {
             // Side by side when there's room for both columns (iPad), stacked otherwise (iPhone, narrow split view).
             if geo.size.width >= 720 {
                 HStack(alignment: .top, spacing: 28) {
-                    ScrollView { editor(totals).padding(Theme.gutter) }
+                    ScrollView { editor(totals).padding(Theme.gutter).tapBackgroundToDismissKeyboard() }
                     ScrollView { SummaryCard(totals: totals, focus: $focus).padding(.vertical, Theme.gutter) }
                         .frame(width: Theme.summaryWidth)
                         .padding(.trailing, Theme.gutter)
@@ -36,17 +37,20 @@ struct CalculatorView: View {
                             SummaryCard(totals: totals, focus: $focus).id("summary")
                         }
                         .padding(Theme.gutter)
+                        .tapBackgroundToDismissKeyboard()
                     }
                     .safeAreaInset(edge: .bottom) {
-                        CostBar(totals: totals) {
-                            focus = nil
-                            withAnimation { proxy.scrollTo("summary", anchor: .top) }
+                        // Out of the way while typing, so nothing crowds the keyboard and its Done bar.
+                        if focus == nil {
+                            CostBar(totals: totals) {
+                                withAnimation { proxy.scrollTo("summary", anchor: .top) }
+                            }
+                            .transition(.opacity)
                         }
                     }
                 }
             }
         }
-        .scrollDismissesKeyboard(.interactively)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Mix")
         .navigationBarTitleDisplayMode(.inline)
@@ -68,19 +72,19 @@ struct CalculatorView: View {
                 .accessibilityLabel("Save recipe")
                 .accessibilityIdentifier("saveRecipe")
             }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button { focus = nil } label: { Text("Done").font(Theme.emphasis) }
-            }
         }
         .sheet(isPresented: $showReorder) { ReorderSheet() }
         .sheet(isPresented: $showPicker) {
             LibraryPicker { itemID in
                 showPicker = false
                 if let id = store.addLine(fromLibrary: itemID) {
-                    DispatchQueue.main.async { focus = .line(id, .amount) }
+                    // Open the new line once the picker has gone, ready for the pour.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { editing = EditorTarget(id: id, focus: .amount) }
                 }
             }
+        }
+        .sheet(item: $editing) { target in
+            IngredientEditor(lineID: target.id, focusOnOpen: target.focus)
         }
     }
 
@@ -160,7 +164,9 @@ struct CalculatorView: View {
                         .padding(.vertical, Theme.rowSpacing)
                 }
                 ForEach(Array(draft.lines.enumerated()), id: \.element.id) { index, line in
-                    IngredientRow(line: line, index: index, totals: totals, focus: $focus) { showReorder = true }
+                    IngredientRow(line: line, index: index, totals: totals,
+                                  open: { focus = nil; editing = EditorTarget(id: line.id, focus: nil) },
+                                  onReorder: { focus = nil; showReorder = true })
                     Hairline()
                 }
             }
@@ -178,7 +184,8 @@ struct CalculatorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Button {
-                    if let id = store.addLine() { DispatchQueue.main.async { focus = .line(id, .name) } }
+                    focus = nil
+                    if let id = store.addLine() { editing = EditorTarget(id: id, focus: .name) }
                 } label: {
                     Label("Add ingredient", systemImage: "plus")
                 }

@@ -70,14 +70,21 @@ struct RootView: View {
         .font(Theme.body)
         .background(Theme.bg.ignoresSafeArea())
         .overlay(alignment: .bottom) { toastOverlay }
+        // A light tap when something is saved, removed or undone, like Apple's own apps.
+        .sensoryFeedback(.impact(weight: .light), trigger: store.toast?.id)
     }
 
     private var sectionSelection: Binding<AppSection?> {
         Binding(get: { section }, set: { if let s = $0 { section = s } })
     }
 
-    @ViewBuilder
+    /// Every screen gets the same keyboard Done bar and drag-to-dismiss.
     private func content(for s: AppSection) -> some View {
+        screen(for: s).keyboardDoneBar()
+    }
+
+    @ViewBuilder
+    private func screen(for s: AppSection) -> some View {
         switch s {
         case .calculator: CalculatorView()
         case .recipes: RecipesView(openCalculator: { section = .calculator })

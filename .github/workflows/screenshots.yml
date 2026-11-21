@@ -43,7 +43,7 @@ permissions:
   actions: read   # to fetch screenshots from an earlier run
 
 env:
-  XCODE_VERSION: "26.6"
+  XCODE_VERSION: "27.1"   # iOS 27.1 SDK: runs full screen on iPhone Duo
   XCODEGEN_VERSION: "2.47.0"
 
 jobs:
@@ -66,7 +66,7 @@ jobs:
   screenshots:
     name: Capture App Store screenshots
     if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
@@ -90,7 +90,7 @@ jobs:
 
       - name: Pick simulators
         run: |
-          echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh "iPhone 17 Pro Max")" >> "$GITHUB_ENV"
+          echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh "iPhone 18 Pro Max")" >> "$GITHUB_ENV"
           echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")" >> "$GITHUB_ENV"
 
       - name: Build for testing

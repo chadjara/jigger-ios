@@ -38,9 +38,19 @@ struct SummaryCard: View {
             }
 
             section {
-                inlineField("Target beverage cost", text: recipeBinding(.targetPct), suffix: "%",
-                            invalid: totals.targetError != nil, identifier: "targetPct", focusValue: .target)
-                errorText(totals.targetError, id: "targetError")
+                Text("Target beverage cost").font(Theme.subhead).foregroundStyle(Theme.muted)
+                HStack(alignment: .bottom, spacing: 12) {
+                    JField(label: nil, text: recipeBinding(.targetPct), placeholder: "20", suffix: "%",
+                           invalid: totals.targetError != nil, identifier: "targetPct", focus: focus, focusValue: .target,
+                           spokenLabel: "Target beverage cost")
+                        .frame(width: 96)
+                    Spacer(minLength: 8)
+                    Stepper("Target beverage cost", onIncrement: { stepTarget(1) }, onDecrement: { stepTarget(-1) })
+                        .labelsHidden()
+                        .accessibilityIdentifier("targetStepper")
+                }
+                FieldMessage(text: totals.targetError, identifier: "targetError")
+                FieldMessage(text: totals.targetNote, kind: .warning, identifier: "targetNote")
                 Text("Suggested menu price").capsLabel().padding(.top, 4)
                 Text(totals.suggestedPrice.map { store.money($0) } ?? "—")
                     .font(Theme.figure(36, relativeTo: .title))
@@ -52,7 +62,9 @@ struct SummaryCard: View {
             section {
                 inlineField("Your menu price", text: recipeBinding(.menuPrice), prefix: store.currencySymbol,
                             invalid: totals.menuError != nil, identifier: "menuPrice", focusValue: .menuPrice)
-                errorText(totals.menuError, id: "menuError")
+                FieldMessage(text: totals.menuError, identifier: "menuError")
+                FieldMessage(text: totals.menuBelowCostBy.map { "Below cost: you’d lose \(store.money($0)) on every drink." },
+                             kind: .warning, identifier: "menuWarning")
                 VStack(spacing: 8) {
                     KeyValueRow(label: "Beverage cost", value: formatPct(totals.bevCostPct), identifier: "bevCostPct")
                     KeyValueRow(label: "Gross profit per drink", value: store.money(totals.grossProfit),
@@ -84,15 +96,18 @@ struct SummaryCard: View {
                         }
                     }
                 }
-                HStack(alignment: .bottom) {
+                HStack(alignment: .bottom, spacing: 12) {
                     Text("Or any number").font(Theme.footnote).foregroundStyle(Theme.faint).padding(.bottom, 8)
-                    Spacer()
+                    Spacer(minLength: 8)
                     JField(label: nil, text: recipeBinding(.servings), placeholder: "1", keyboard: .numberPad,
                            invalid: totals.servingsError != nil, identifier: "servings", focus: focus, focusValue: .servings,
                            spokenLabel: "Number of servings")
-                        .frame(width: 96)
+                        .frame(width: 72)
+                    Stepper("Servings", onIncrement: { stepServings(1) }, onDecrement: { stepServings(-1) })
+                        .labelsHidden()
+                        .accessibilityIdentifier("servingsStepper")
                 }
-                errorText(totals.servingsError, id: "servingsError")
+                FieldMessage(text: totals.servingsError, identifier: "servingsError")
                 let rows = store.batchRows(totals)
                 if rows.isEmpty {
                     Text("Pick a number of drinks to cost a batch.").font(Theme.subhead).foregroundStyle(Theme.muted)
@@ -145,11 +160,22 @@ struct SummaryCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private func errorText(_ message: String?, id: String) -> some View {
-        if let message {
-            Text(message).font(Theme.footnote).foregroundStyle(Theme.danger).accessibilityIdentifier(id)
-        }
+    /// Target % in whole steps, kept within 1–99.
+    private func stepTarget(_ delta: Int) {
+        focus.wrappedValue = nil
+        let current = parseNumber(store.draft.targetPct).value ?? parseNumber(store.settings.targetPct).value ?? 20
+        var next = roundHalfUp(current, places: 0) + Decimal(delta)
+        next = min(max(next, 1), 99)
+        store.setRecipe(.targetPct, plainString(next))
+    }
+
+    /// Servings in whole drinks, kept within 1–10,000.
+    private func stepServings(_ delta: Int) {
+        focus.wrappedValue = nil
+        let current = parseNumber(store.draft.servings).value ?? 1
+        var next = roundHalfUp(current, places: 0) + Decimal(delta)
+        next = min(max(next, 1), 10_000)
+        store.setRecipe(.servings, plainString(next))
     }
 
     private func inlineField(_ label: String, text: Binding<String>, prefix: String? = nil, suffix: String? = nil,

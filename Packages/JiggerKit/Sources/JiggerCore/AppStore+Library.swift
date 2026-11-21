@@ -48,6 +48,25 @@ extension AppStore {
         return bad
     }
 
+    /// A message for each field that's missing or wrong, for the My Ingredients editor (new or existing item).
+    public func libraryFieldMessages(name: String, price: String, size: String, sizeUnit: String,
+                                     excluding id: String? = nil) -> [LibraryTextField: String] {
+        var m: [LibraryTextField: String] = [:]
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { m[.name] = "Enter a name" }
+        else if identicalLibraryItem(name: name, size: size, sizeUnit: sizeUnit, excluding: id) != nil {
+            m[.name] = "Already in My Ingredients with this package size"
+        }
+        let p = parseNumber(price)
+        if p.isBlank { m[.price] = "Enter the price you pay" }
+        else if p.isInvalid { m[.price] = "Enter a price like 24.99" }
+        else if let v = p.value, v < 0 { m[.price] = "Price can’t be negative" }
+        let sz = parseNumber(size)
+        if sz.isBlank { m[.size] = "Enter the package size" }
+        else if sz.isInvalid { m[.size] = "Enter a size like 750" }
+        else if let v = sz.value, !(v > 0) { m[.size] = "Size must be more than 0" }
+        return m
+    }
+
     /// Adds a new ingredient to My Ingredients. Shows a message and returns false when something is missing.
     @discardableResult
     public func addLibraryItem(name: String, price: String, size: String, sizeUnit: JiggerUnit) -> Bool {
