@@ -81,6 +81,13 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
+      - name: Start the iPad and iPhone Duo simulators (they warm up while the iPhone tests run)
+        if: env.FULL == 'true'
+        run: |
+          # A first boot of a device type is slow; booting at test time timed the test runner out.
+          xcrun simctl boot "$IPAD_UDID" || true
+          xcrun simctl boot "$DUO_UDID" || true
+
       - name: Quick tests on iPhone simulator (app unit tests; draft PR)
         if: env.FULL != 'true'
         run: |
@@ -110,6 +117,7 @@ jobs:
         if: env.FULL == 'true'
         run: |
           set -o pipefail
+          xcrun simctl bootstatus "$IPAD_UDID" -b
           xcodebuild test-without-building \
             -project Jigger.xcodeproj -scheme Jigger \
             -destination "id=$IPAD_UDID" \
@@ -124,6 +132,7 @@ jobs:
         if: env.FULL == 'true'
         run: |
           set -o pipefail
+          xcrun simctl bootstatus "$DUO_UDID" -b
           xcodebuild test-without-building \
             -project Jigger.xcodeproj -scheme Jigger \
             -destination "id=$DUO_UDID" \
