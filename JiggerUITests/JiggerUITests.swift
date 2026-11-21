@@ -86,6 +86,16 @@ final class JiggerUITests: XCTestCase {
         XCTAssertTrue(field("editor.amount").waitForExistence(timeout: 5), "ingredient editor didn't open")
     }
 
+    /// Forms only load the rows on screen, so scroll the open sheet until the element is there.
+    private func reveal(_ id: String) {
+        let target = element(id)
+        var tries = 0
+        while !(target.exists && target.isHittable) && tries < 6 {
+            app.swipeUp()
+            tries += 1
+        }
+    }
+
     private func closeEditor() {
         dismissKeyboard()
         tap("editor.done")
@@ -130,6 +140,7 @@ final class JiggerUITests: XCTestCase {
         closeEditor()
         XCTAssertTrue(element("row1").waitForExistence(timeout: 5), "new row didn't appear")
         openRow(0)
+        reveal("editor.remove")
         tap("editor.remove")
         XCTAssertTrue(element("row0").waitForExistence(timeout: 5))
         XCTAssertFalse(element("row1").exists, "row wasn't removed")
@@ -297,9 +308,11 @@ final class JiggerUITests: XCTestCase {
 
     func testMoveAnIngredientToTheTop() {
         launch()
-        let row = element("row4")
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        row.press(forDuration: 1.2)
+        // Touch and hold the ingredient's name, as a finger would.
+        let name = app.staticTexts["row4.name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        if !name.isHittable { app.swipeUp() }
+        name.press(forDuration: 1.5)
         let moveToTop = app.buttons["Move to top"].firstMatch
         XCTAssertTrue(moveToTop.waitForExistence(timeout: 5), "row menu didn't open")
         moveToTop.tap()
