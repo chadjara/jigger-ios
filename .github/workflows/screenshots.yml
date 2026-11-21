@@ -50,21 +50,18 @@ jobs:
   inspect:
     name: List Xcodes and simulators
     if: inputs.inspect
-    runs-on: macos-latest
-    timeout-minutes: 10
+    runs-on: xcode-27
+    timeout-minutes: 15
     steps:
       - name: Xcodes, simulator runtimes and device types
         run: |
           echo "== Xcodes =="; ls -d /Applications/Xcode*.app
-          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          X="$(ls -d /Applications/Xcode_27.1*.app 2>/dev/null | sort -V | tail -1)"
+          echo "== Selecting $X =="; sudo xcode-select -s "$X"; xcodebuild -version
           echo "== Runtimes =="; xcrun simctl list runtimes
-          echo "== Device types matching Duo/Fold =="; xcrun simctl list devicetypes | grep -iE "duo|fold" || echo "(none)"
-          echo "== Devices matching Duo/Fold =="; xcrun simctl list devices | grep -iE "duo|fold" || echo "(none)"
-          echo "== simctl commands mentioning fold/display/posture =="; xcrun simctl help 2>&1 | grep -iE "fold|display|posture|hinge" || echo "(none)"
-          for X in /Applications/Xcode*.app; do
-            echo "== $X device types (Duo/Fold) =="
-            ls "$X/Contents/Developer/Platforms/iPhoneOS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes" 2>/dev/null | grep -iE "duo|fold" || echo "(none)"
-          done
+          echo "== Device types =="; xcrun simctl list devicetypes | grep -iE "iphone|ipad"
+          echo "== Available iPhone/iPad devices (newest runtime) =="; xcrun simctl list devices available | grep -iE "iphone|ipad|-- iOS" | tail -40
+          echo "== simctl help mentioning fold/display/posture =="; xcrun simctl help 2>&1 | grep -iE "fold|display|posture|hinge|screen" || echo "(none)"
 
   screenshots:
     name: Capture App Store screenshots
