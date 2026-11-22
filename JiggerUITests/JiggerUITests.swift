@@ -209,16 +209,28 @@ final class JiggerUITests: XCTestCase {
         launch()
         openRow(0)
         field("editor.amount").tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the pour")
         XCTAssertFalse(keyboardHasLetters, "the pour field should show a number pad, not letters")
         XCTAssertTrue(app.buttons["fraction.½"].exists, "fraction keys should sit above the number pad")
         dismissKeyboard()
         field("editor.price").tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the price")
         XCTAssertFalse(keyboardHasLetters, "the price field should show a number pad")
         dismissKeyboard()
         XCTAssertFalse(app.keyboards.firstMatch.exists, "Done should close the keyboard")
         closeEditor()
+    }
+
+    /// The ingredient editor always has a visible Done that closes it (every device and presentation).
+    func testIngredientEditorOpensAndCloses() {
+        launch()
+        openRow(0)
+        let done = app.buttons["editor.done"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "the editor has no Done button. UI: \(uiTree())")
+        XCTAssertTrue(done.isHittable, "the editor's Done button isn't on screen")
+        done.tap()
+        XCTAssertTrue(field("editor.amount").waitForNonExistence(timeout: 5), "Done didn't close the editor")
+        XCTAssertTrue(element("row0").exists)
     }
 
     func testKeyboardCanBeClosedOnMix() {

@@ -17,8 +17,6 @@ struct IngredientEditor: View {
     @Environment(\.dismiss) private var dismiss
     let lineID: String
     var focusOnOpen: Field?
-    /// Also show Done along the bottom (regular-width screens; see `sheetActionBar`).
-    var actionBar = false
     @FocusState private var focus: Field?
 
     var body: some View {
@@ -239,13 +237,10 @@ struct IngredientEditor: View {
         }
         .keyboardDoneBarless()
         .navigationTitle(resolved.name.isEmpty ? "Ingredient \(number)" : resolved.name)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { dismiss() } label: { Text("Done").font(Theme.emphasis) }
-                    .accessibilityIdentifier("editor.done")
-            }
-        }
-        .sheetActionBar(actionBar, [SheetAction(id: "editor.doneBar", title: "Done") { dismiss() }])
+        // Done is a full-width button along the bottom on every device: thumb-friendly, above the keyboard,
+        // and drawn by the form itself, so no presentation style can hide it (iPhone Duo's sheet dropped the
+        // navigation-bar button).
+        .sheetActionBar(true, [SheetAction(id: "editor.done", title: "Done") { dismiss() }])
     }
 
     // MARK: - Package and unit

@@ -85,7 +85,7 @@ struct CalculatorView: View {
             }
         }
         .sheet(item: $editing) { target in
-            IngredientEditor(lineID: target.id, focusOnOpen: target.focus, actionBar: sizeClass == .regular)
+            IngredientEditor(lineID: target.id, focusOnOpen: target.focus)
         }
     }
 
