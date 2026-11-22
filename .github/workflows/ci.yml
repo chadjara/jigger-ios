@@ -182,6 +182,8 @@ jobs:
             -resultBundlePath results/iPad.xcresult \
             -only-testing:JiggerUITests/JiggerUITests/testIPadShowsSidebarAndSummaryBesideTheCalculator \
             -only-testing:JiggerUITests/JiggerUITests/testAppFillsTheScreenAndTheKeyboardLinesUp \
+            -only-testing:JiggerUITests/JiggerUITests/testNumberFieldsUseANumberKeyboard \
+            -only-testing:JiggerUITests/JiggerUITests/testAddAnIngredientInMyIngredients \
             -parallel-testing-enabled NO \
             -quiet
 
@@ -206,6 +208,7 @@ jobs:
             -only-testing:JiggerUITests/JiggerUITests/testNumberFieldsUseANumberKeyboard \
             -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnMix \
             -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnSettings \
+            -only-testing:JiggerUITests/JiggerUITests/testAddAnIngredientInMyIngredients \
             -parallel-testing-enabled NO \
             -quiet
 

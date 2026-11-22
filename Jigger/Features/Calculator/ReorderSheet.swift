@@ -5,6 +5,8 @@ import JiggerCore
 struct ReorderSheet: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    /// Also show Done along the bottom (regular-width screens; see `sheetActionBar`).
+    var actionBar = false
 
     var body: some View {
         NavigationStack {
@@ -40,6 +42,7 @@ struct ReorderSheet: View {
             .environment(\.editMode, .constant(.active))
             .scrollContentBackground(.hidden)
             .background(Theme.bg.ignoresSafeArea())
+            .sheetActionBar(actionBar, [SheetAction(id: "reorderDoneBar", title: "Done") { dismiss() }])
             .navigationTitle("Reorder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

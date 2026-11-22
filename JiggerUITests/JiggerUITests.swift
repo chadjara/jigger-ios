@@ -116,9 +116,13 @@ final class JiggerUITests: XCTestCase {
     private func closeEditor() {
         dismissKeyboard()
         waitForToastToClear()
-        // By identifier, or by its visible "Done" label in the sheet's navigation bar: both are what a person taps.
+        // The navigation-bar Done, the bottom Done bar (iPad, iPhone Duo), or a "Done" in the sheet's
+        // navigation bar: all are what a person taps.
         var done = app.buttons["editor.done"].firstMatch
-        if !done.waitForExistence(timeout: 5) {
+        if !(done.waitForExistence(timeout: 5) && done.isHittable) {
+            done = app.buttons["editor.doneBar"].firstMatch
+        }
+        if !done.exists {
             done = app.navigationBars.buttons["Done"].firstMatch
         }
         guard done.waitForExistence(timeout: 3) else {
@@ -312,12 +316,16 @@ final class JiggerUITests: XCTestCase {
         goTo("Ingredients", sidebarID: "sidebar.ingredients")
         tap("libAdd")
         XCTAssertTrue(field("libEditor.name").waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["libEditor.save"].isEnabled, "Save should wait for valid details")
+        // Save sits in the navigation bar, or in the bottom bar on iPad / iPhone Duo.
+        let navSave = app.buttons["libEditor.save"].firstMatch
+        let save = navSave.waitForExistence(timeout: 3) && navSave.isHittable ? navSave : app.buttons["libEditor.saveBar"].firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "no Save button. UI: \(uiTree())")
+        XCTAssertFalse(save.isEnabled, "Save should wait for valid details")
         type("libEditor.name", "Campari")
         type("libEditor.price", "29.99")
         dismissKeyboard()
-        XCTAssertTrue(app.buttons["libEditor.save"].isEnabled)
-        tap("libEditor.save")
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
         XCTAssertTrue(element("lib.Campari").waitForExistence(timeout: 5), "new ingredient missing from the list")
     }
 

@@ -12,6 +12,7 @@ enum FieldFocus: Hashable {
 /// Mix: the costing screen. Ingredients on the left (or top), the tab beside them (or below on iPhone).
 struct CalculatorView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @FocusState private var focus: FieldFocus?
     @State private var showPicker = false
     @State private var showReorder = false
@@ -73,9 +74,9 @@ struct CalculatorView: View {
                 .accessibilityIdentifier("saveRecipe")
             }
         }
-        .sheet(isPresented: $showReorder) { ReorderSheet() }
+        .sheet(isPresented: $showReorder) { ReorderSheet(actionBar: sizeClass == .regular) }
         .sheet(isPresented: $showPicker) {
-            LibraryPicker { itemID in
+            LibraryPicker(actionBar: sizeClass == .regular) { itemID in
                 showPicker = false
                 if let id = store.addLine(fromLibrary: itemID) {
                     // Open the new line once the picker has gone, ready for the pour.
@@ -84,7 +85,7 @@ struct CalculatorView: View {
             }
         }
         .sheet(item: $editing) { target in
-            IngredientEditor(lineID: target.id, focusOnOpen: target.focus)
+            IngredientEditor(lineID: target.id, focusOnOpen: target.focus, actionBar: sizeClass == .regular)
         }
     }
 

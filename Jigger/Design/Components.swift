@@ -203,6 +203,44 @@ extension View {
     }
 }
 
+// MARK: - Sheet actions
+
+/// One action in a sheet's bottom bar.
+struct SheetAction: Identifiable {
+    let id: String
+    let title: String
+    var prominent = true
+    var enabled = true
+    let action: () -> Void
+}
+
+extension View {
+    /// On regular-width screens (iPad, iPhone Duo) a sheet also gets its main actions as full-width buttons
+    /// along the bottom. There, iOS can present the sheet without drawing its navigation-bar buttons, and a
+    /// sheet must never be left without a visible way to finish. iPhone keeps the navigation-bar buttons.
+    @ViewBuilder
+    func sheetActionBar(_ show: Bool, _ actions: [SheetAction]) -> some View {
+        if show {
+            safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: 12) {
+                    ForEach(actions) { a in
+                        Button(action: a.action) { Text(a.title).frame(maxWidth: .infinity) }
+                            .buttonStyle(JButtonStyle(prominent: a.prominent))
+                            .disabled(!a.enabled)
+                            .accessibilityIdentifier(a.id)
+                    }
+                }
+                .padding(.horizontal, Theme.gutter)
+                .padding(.vertical, 12)
+                .background(Theme.surface)
+                .overlay(alignment: .top) { Hairline(color: Theme.lineStrong) }
+            }
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Buttons
 
 /// Square measure button for pours and servings. Selected reads as a filled brass jigger mark.

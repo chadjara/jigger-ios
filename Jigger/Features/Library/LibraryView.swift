@@ -6,6 +6,7 @@ import JiggerEngine
 /// except recipes with their own custom price for that line.
 struct LibraryView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var query = ""
     @State private var editing: LibraryEditorTarget?
 
@@ -61,7 +62,7 @@ struct LibraryView: View {
             }
         }
         .sheet(item: $editing) { target in
-            LibraryItemEditor(target: target)
+            LibraryItemEditor(target: target, actionBar: sizeClass == .regular)
         }
     }
 }
@@ -135,6 +136,8 @@ struct LibraryItemEditor: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let target: LibraryEditorTarget
+    /// Also show Save/Cancel or Done along the bottom (regular-width screens; see `sheetActionBar`).
+    var actionBar = false
     @State private var name = ""
     @State private var price = ""
     @State private var size = "750"
@@ -226,6 +229,10 @@ struct LibraryItemEditor: View {
             .scrollContentBackground(.hidden)
             .background(Theme.bg.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+            .sheetActionBar(actionBar, existingID == nil
+                ? [SheetAction(id: "libEditor.cancelBar", title: "Cancel", prominent: false) { dismiss() },
+                   SheetAction(id: "libEditor.saveBar", title: "Save", enabled: messages.isEmpty) { save() }]
+                : [SheetAction(id: "libEditor.doneBar", title: "Done") { dismiss() }])
             .navigationTitle(existingID == nil ? "New ingredient" : (name.isEmpty ? "Ingredient" : name))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

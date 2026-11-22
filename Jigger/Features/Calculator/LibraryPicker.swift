@@ -6,6 +6,8 @@ struct LibraryPicker: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    /// Also show Cancel along the bottom (regular-width screens; see `sheetActionBar`).
+    var actionBar = false
     let onPick: (String) -> Void
 
     var body: some View {
@@ -39,6 +41,7 @@ struct LibraryPicker: View {
             .font(Theme.body)
             .searchable(text: $query, prompt: "Search saved ingredients")
             .keyboardDoneBar()
+            .sheetActionBar(actionBar, [SheetAction(id: "pickerCancelBar", title: "Cancel", prominent: false) { dismiss() }])
             .navigationTitle("My Ingredients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
