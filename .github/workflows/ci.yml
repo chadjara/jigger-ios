@@ -53,6 +53,8 @@ jobs:
 
       - name: Cache XcodeGen
         uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"   # a slow cache gives up quickly; XcodeGen is then downloaded
         with:
           path: ~/.xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
@@ -133,18 +135,20 @@ jobs:
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
           xcodebuild -version
 
-      - name: Pick and boot the iPad and iPhone Duo simulators
+      - name: Pick the simulators and start booting the iPad
         run: |
           IPAD="$(.github/scripts/pick-simulator.sh iPad)"
           DUO="$(.github/scripts/pick-simulator.sh "iPhone Duo")"
           echo "IPAD_UDID=$IPAD" >> "$GITHUB_ENV"
           echo "DUO_UDID=$DUO" >> "$GITHUB_ENV"
-          # A device's first boot is slow; start both now so they're ready by the time the build finishes.
+          # A device's first boot is slow; the iPad boots while the app builds. Only one simulator runs at a
+          # time, so the two never compete for this machine.
           xcrun simctl boot "$IPAD" || true
-          xcrun simctl boot "$DUO" || true
 
       - name: Cache XcodeGen
         uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"   # a slow cache gives up quickly; XcodeGen is then downloaded
         with:
           path: ~/.xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
@@ -165,10 +169,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
-      - name: Wait for both simulators to finish booting
-        run: |
-          xcrun simctl bootstatus "$IPAD_UDID" -b
-          xcrun simctl bootstatus "$DUO_UDID" -b
+      - name: Wait for the iPad simulator to finish booting
+        run: xcrun simctl bootstatus "$IPAD_UDID" -b
 
       - name: Test on iPad simulator (sidebar layout)
         run: |
@@ -183,7 +185,15 @@ jobs:
             -parallel-testing-enabled NO \
             -quiet
 
+      - name: Swap to the iPhone Duo simulator
+        if: ${{ !cancelled() }}   # Duo results are useful even when an iPad test fails
+        run: |
+          xcrun simctl shutdown "$IPAD_UDID" || true
+          xcrun simctl boot "$DUO_UDID" || true
+          xcrun simctl bootstatus "$DUO_UDID" -b
+
       - name: Test on iPhone Duo simulator (full screen, keyboard, editor)
+        if: ${{ !cancelled() }}
         run: |
           set -o pipefail
           xcodebuild test-without-building \

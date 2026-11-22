@@ -42,20 +42,40 @@ struct RootView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var section: AppSection = .calculator
+    /// The window's width, measured once per change. Nil until the first layout.
+    @State private var width: CGFloat?
 
     /// Narrowest width that shows the sidebar beside the content.
     private static let sidebarMinWidth: CGFloat = 700
 
+    /// Regular size class with room for a sidebar. Before the first measurement, trust the size class,
+    /// so an iPad doesn't build tabs first and then switch.
+    private var wide: Bool {
+        sizeClass == .regular && (width.map { $0 >= Self.sidebarMinWidth } ?? true)
+    }
+
     var body: some View {
-        GeometryReader { geo in
-            let wide = sizeClass == .regular && geo.size.width >= Self.sidebarMinWidth
-            layout(wide: wide)
-                .overlay(alignment: .bottom) { toastOverlay(wide: wide) }
-        }
+        layout(wide: wide)
+            .overlay(alignment: .bottom) { toastOverlay(wide: wide) }
+            // Measured in the background, so only a change in the answer (not every resize, rotation or
+            // keyboard) re-renders the root.
+            .background {
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { measure(geo.size.width) }
+                        .onChange(of: geo.size.width) { _, new in measure(new) }
+                }
+            }
         .font(Theme.body)
         .background(Theme.bg.ignoresSafeArea())
         // A light tap when something is saved, removed or undone, like Apple's own apps.
         .sensoryFeedback(.impact(weight: .light), trigger: store.toast?.id)
+    }
+
+    /// Stores the width only when it changes which side of the sidebar threshold we're on.
+    private func measure(_ new: CGFloat) {
+        guard new > 0 else { return }
+        if width == nil || (new >= Self.sidebarMinWidth) != (width! >= Self.sidebarMinWidth) { width = new }
     }
 
     @ViewBuilder
