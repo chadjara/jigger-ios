@@ -84,6 +84,14 @@ final class JiggerUITests: XCTestCase {
         return "navigation bars: \(bars); buttons: \(buttons.joined(separator: ", "))"
     }
 
+    /// Where a field and the editor's Done bar are, and whether the editor is still open (for failure messages).
+    private func editorState(_ fieldID: String) -> String {
+        let f = field(fieldID)
+        let bar = app.buttons["editor.done"].firstMatch
+        return "editor open: \(f.exists); field frame: \(f.exists ? "\(f.frame)" : "-"); "
+            + "Done bar frame: \(bar.exists ? "\(bar.frame)" : "-"); window: \(app.windows.firstMatch.frame)"
+    }
+
     private func waitForToastToClear() {
         let toast = app.descendants(matching: .any)["toast"].firstMatch
         if toast.exists { _ = toast.waitForNonExistence(timeout: 10) }
@@ -109,13 +117,32 @@ final class JiggerUITests: XCTestCase {
     /// Scrolls until the field is in view and not covered (e.g. by a sheet's bottom Done bar), as a person
     /// would before tapping it.
     private func revealField(_ f: XCUIElement) {
-        var tries = 0
-        while !f.isHittable && tries < 4 {
-            app.swipeUp()
-            tries += 1
-            // Let the scroll settle: a tap on a still-moving list only stops it and never focuses the field.
-            Thread.sleep(forTimeInterval: 1)
+        let bar = app.buttons["editor.done"].firstMatch
+        // `isHittable` can still say yes for a field sitting under the bar, so compare positions instead.
+        func covered() -> Bool {
+            guard f.exists else { return true }
+            if bar.exists { return f.frame.maxY > bar.frame.minY - 8 }
+            return !f.isHittable
         }
+        var tries = 0
+        while covered() && tries < 5 {
+            scrollSheetUp(above: bar)
+            tries += 1
+        }
+    }
+
+    /// Drags the open sheet's content up by about 250 pt, slowly so it doesn't fling: the list stops where
+    /// the finger lifts, and the next tap focuses a field instead of just stopping the scroll.
+    /// The drag starts just above the bottom bar, so it's always inside the sheet.
+    private func scrollSheetUp(above bar: XCUIElement) {
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let window = app.windows.firstMatch.frame
+        let x = bar.exists ? bar.frame.midX : window.midX
+        let startY = bar.exists ? bar.frame.minY - 40 : window.midY + window.height * 0.15
+        let start = origin.withOffset(CGVector(dx: x, dy: startY))
+        let end = origin.withOffset(CGVector(dx: x, dy: max(startY - 250, window.minY + 120)))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        Thread.sleep(forTimeInterval: 0.5)
     }
 
     /// Scrolls the open sheet back to the top until the element (e.g. the live cost header) is loaded again.
@@ -239,13 +266,15 @@ final class JiggerUITests: XCTestCase {
         openRow(0)
         revealField(field("editor.amount"))
         field("editor.amount").tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the pour")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5),
+                      "the on-screen keyboard didn't open for the pour. \(editorState("editor.amount"))")
         XCTAssertFalse(keyboardHasLetters, "the pour field should show a number pad, not letters")
         XCTAssertTrue(app.buttons["fraction.½"].exists, "fraction keys should sit above the number pad")
         dismissKeyboard()
         revealField(field("editor.price"))
         field("editor.price").tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the price")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5),
+                      "the on-screen keyboard didn't open for the price. \(editorState("editor.price"))")
         XCTAssertFalse(keyboardHasLetters, "the price field should show a number pad")
         dismissKeyboard()
         XCTAssertFalse(app.keyboards.firstMatch.exists, "Done should close the keyboard")
