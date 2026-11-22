@@ -71,6 +71,38 @@ extension AppStore {
         return l.id
     }
 
+    /// Copies a line (with its own new id) right below the original. Returns the copy's id, or nil at the limit.
+    @discardableResult
+    public func duplicateLine(_ id: String) -> String? {
+        guard canAddLine, let i = draft.lines.firstIndex(where: { $0.id == id }) else { return nil }
+        var copy = draft.lines[i]
+        copy.id = makeID()
+        mutateDraft { $0.lines.insert(copy, at: i + 1) }
+        return copy.id
+    }
+
+    /// The step a pour stepper moves by, in the unit the pour is shown in.
+    public func pourStep(_ l: Line) -> Decimal {
+        let unit = displayAmountUnit(l)
+        switch unit {
+        case "ml": return 5
+        case "g": return 1
+        case "kg": return Decimal(string: "0.01", locale: Locale(identifier: "en_US_POSIX"))!
+        case "lb": return Decimal(string: "0.05", locale: Locale(identifier: "en_US_POSIX"))!
+        default: return Decimal(string: "0.25", locale: Locale(identifier: "en_US_POSIX"))! // fl oz, oz wt, each
+        }
+    }
+
+    /// Moves the pour up or down by whole steps (never below zero), in the unit currently shown.
+    public func stepPour(_ id: String, by steps: Int) {
+        guard let l = draft.lines.first(where: { $0.id == id }) else { return }
+        let step = pourStep(l)
+        let current = parseNumber(displayAmount(l)).value ?? 0
+        var next = current + step * Decimal(steps)
+        if next < 0 { next = 0 }
+        setLine(id, .amount, plainString(next))
+    }
+
     public func removeLine(_ id: String) {
         guard let i = draft.lines.firstIndex(where: { $0.id == id }) else { return }
         let removed = draft.lines[i]

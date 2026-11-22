@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import JiggerCore
+import JiggerEngine
 
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
@@ -18,12 +19,20 @@ struct SettingsView: View {
                     ForEach(Catalog.currencies) { c in Text("\(c.name) (\(c.code))").tag(c.code) }
                 }
                 .accessibilityIdentifier("setCurrency")
-                HStack {
-                    Text("Target beverage cost")
-                    Spacer()
-                    JField(label: nil, text: targetBinding, placeholder: "20", suffix: "%", invalid: targetInvalid,
-                           identifier: "setTarget", spokenLabel: "Default target beverage cost")
-                        .frame(width: 110)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Target beverage cost")
+                        Spacer()
+                        JField(label: nil, text: targetBinding, placeholder: "20", suffix: "%", invalid: targetInvalid,
+                               identifier: "setTarget", spokenLabel: "Default target beverage cost")
+                            .frame(width: 110)
+                    }
+                    if targetInvalid {
+                        FieldMessage(text: checkTargetPct(targetText).error ?? "Enter a target between 1 and 99%",
+                                     identifier: "setTargetError")
+                    } else {
+                        FieldMessage(text: checkTargetPct(targetText).note, kind: .warning, identifier: "setTargetNote")
+                    }
                 }
                 Picker("Pour unit", selection: Binding(get: { store.settings.displayUnit }, set: { store.setDisplayUnit($0) })) {
                     Text("Fluid ounces (oz)").tag("floz")

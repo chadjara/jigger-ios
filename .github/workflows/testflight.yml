@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - "**/*.md"
       - "reference/**"
+      - "docs/**"
       - "LICENSE"
   workflow_dispatch:
 
@@ -20,13 +21,13 @@ permissions:
   contents: read
 
 env:
-  XCODE_VERSION: "26.6"
+  XCODE_VERSION: "27.1"   # iOS 27.1 SDK: runs full screen on iPhone Duo
   XCODEGEN_VERSION: "2.47.0"
 
 jobs:
   upload:
     name: Archive & upload to TestFlight
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
@@ -38,6 +39,8 @@ jobs:
 
       - name: Cache XcodeGen
         uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"   # a slow cache gives up quickly; XcodeGen is then downloaded
         with:
           path: ~/.xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}

@@ -109,6 +109,7 @@ struct JField: View {
                 TextField(placeholder, text: $text)
                     .font(entryFont)
                     .keyboardType(keyboard)
+                    .submitLabel(.done)
                     .autocorrectionDisabled(keyboard != .default)
                     .textInputAutocapitalization(keyboard == .default ? .words : .never)
                     .disabled(disabled)
@@ -127,7 +128,7 @@ struct JField: View {
         }
     }
 
-    private var entryFont: Font { compact ? Theme.footnote : Theme.body }
+    private var entryFont: Font { compact ? Theme.inputSmall : Theme.input }
 }
 
 /// The underlined label a menu picker shows, matching `JField`.
@@ -148,6 +149,95 @@ struct MenuFieldLabel: View {
             Rectangle().fill(invalid ? Theme.danger : Theme.lineStrong).frame(height: invalid ? 2 : Theme.hairline)
         }
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Messages and keyboard
+
+/// A message under an input: an error (red) when the entry can't be used, a warning (amber) when it's
+/// valid but unusual. VoiceOver reads it with the field.
+struct FieldMessage: View {
+    enum Kind { case error, warning }
+    let text: String?
+    var kind: Kind = .error
+    var identifier: String?
+
+    var body: some View {
+        if let text {
+            Label {
+                Text(text).fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: kind == .error ? "exclamationmark.circle.fill" : "exclamationmark.triangle.fill")
+            }
+            .font(Theme.footnote)
+            .foregroundStyle(kind == .error ? Theme.danger : Theme.warn)
+            .accessibilityLabel((kind == .error ? "Error: " : "Check: ") + text)
+            .accessibilityIdentifier(identifier ?? "")
+        }
+    }
+}
+
+/// Closes the on-screen keyboard from anywhere.
+func hideKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+}
+
+extension View {
+    /// Every screen and sheet gets the same ways to put the keyboard away: a Done button above it,
+    /// dragging the content, and tapping empty space.
+    func keyboardDoneBar() -> some View {
+        self
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button { hideKeyboard() } label: { Text("Done").font(Theme.emphasis) }
+                        .accessibilityIdentifier("keyboardDone")
+                }
+            }
+    }
+
+    /// Tapping blank space behind the content closes the keyboard (controls on top still get their taps).
+    func tapBackgroundToDismissKeyboard() -> some View {
+        background(Color.clear.contentShape(Rectangle()).onTapGesture { hideKeyboard() })
+    }
+}
+
+// MARK: - Sheet actions
+
+/// One action in a sheet's bottom bar.
+struct SheetAction: Identifiable {
+    let id: String
+    let title: String
+    var prominent = true
+    var enabled = true
+    let action: () -> Void
+}
+
+extension View {
+    /// On regular-width screens (iPad, iPhone Duo) a sheet also gets its main actions as full-width buttons
+    /// along the bottom. There, iOS can present the sheet without drawing its navigation-bar buttons, and a
+    /// sheet must never be left without a visible way to finish. iPhone keeps the navigation-bar buttons.
+    @ViewBuilder
+    func sheetActionBar(_ show: Bool, _ actions: [SheetAction]) -> some View {
+        if show {
+            safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: 12) {
+                    ForEach(actions) { a in
+                        Button(action: a.action) { Text(a.title).frame(maxWidth: .infinity) }
+                            .buttonStyle(JButtonStyle(prominent: a.prominent))
+                            .disabled(!a.enabled)
+                            .accessibilityIdentifier(a.id)
+                    }
+                }
+                .padding(.horizontal, Theme.gutter)
+                .padding(.vertical, 12)
+                .background(Theme.surface)
+                .overlay(alignment: .top) { Hairline(color: Theme.lineStrong) }
+            }
+        } else {
+            self
+        }
     }
 }
 

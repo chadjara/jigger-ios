@@ -44,6 +44,8 @@ public struct LineResult: Equatable, Sendable {
     public var status: LineStatus
     public var cost: Decimal?
     public var errors: [LineField: String]
+    /// Entries that are valid but unusual enough to double-check (the cost still counts).
+    public var warnings: [LineField: String] = [:]
 
     /// Error messages in field order, for display.
     public var errorMessages: [String] { LineField.allCases.compactMap { errors[$0] } }
@@ -92,5 +94,10 @@ public func lineCost(_ line: LineInput, fallbackWaste: String? = nil) -> LineRes
 
     // Multiply first, divide last: keeps results exact whenever they can be.
     let raw = p * toBase(a, amountUnit) / toBase(s, sizeUnit)
-    return LineResult(id: line.id, status: .ok, cost: applyWaste(raw, waste.value ?? 0), errors: [:])
+    var warnings: [LineField: String] = [:]
+    if toBase(a, amountUnit) > toBase(s, sizeUnit) {
+        warnings[.amount] = "That’s more than a whole package per drink. Check the pour and the package size."
+    }
+    if let w = waste.value, w > 50 { warnings[.waste] = "Over 50% waste is unusual. Check the waste %." }
+    return LineResult(id: line.id, status: .ok, cost: applyWaste(raw, waste.value ?? 0), errors: [:], warnings: warnings)
 }

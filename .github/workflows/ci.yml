@@ -2,7 +2,7 @@
 # macOS minutes are billed at 10x on a private repo, so the simulator work depends on the PR:
 #   draft PR (quick path):  build + app unit tests (PDF, theme, backup) on iPhone.
 #   ready for review / manual run (full gate before merge):  every unit, engine, core and UI test
-#   on iPhone, plus the iPad sidebar layout test.
+#   on iPhone, the iPad layout tests, and the iPhone Duo full-screen and keyboard tests.
 name: CI
 
 on:
@@ -11,6 +11,7 @@ on:
     paths-ignore:
       - "**/*.md"
       - "reference/**"
+      - "docs/**"
       - "LICENSE"
   workflow_dispatch:
 
@@ -22,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  XCODE_VERSION: "26.6"
+  XCODE_VERSION: "27.1"   # iOS 27.1 SDK: runs full screen on iPhone Duo
   XCODEGEN_VERSION: "2.47.0"
 
 jobs:
@@ -38,8 +39,8 @@ jobs:
 
   ios:
     name: iOS build & tests (simulator)
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: xcode-27
+    timeout-minutes: 60
     env:
       FULL: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
@@ -52,6 +53,8 @@ jobs:
 
       - name: Cache XcodeGen
         uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"   # a slow cache gives up quickly; XcodeGen is then downloaded
         with:
           path: ~/.xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
@@ -65,9 +68,6 @@ jobs:
       - name: Pick simulators
         run: |
           echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh iPhone)" >> "$GITHUB_ENV"
-          if [ "$FULL" = "true" ]; then
-            echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh iPad)" >> "$GITHUB_ENV"
-          fi
 
       - name: Build for testing
         run: |
@@ -104,8 +104,75 @@ jobs:
             -parallel-testing-enabled NO \
             -quiet
 
+      - name: Test counts
+        if: always()
+        run: |
+          .github/scripts/test-summary.sh "iPhone" results/iPhone.xcresult
+          if [ "$FULL" != "true" ]; then
+            echo "### Draft PR: quick path (UI, iPad and iPhone Duo tests run once the PR is marked ready for review)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results
+          path: results/
+          retention-days: 7
+
+  devices:
+    # iPad and iPhone Duo run on their own machine, in parallel with the iPhone job, so no runner has to
+    # host more than its own simulators. Skipped on draft PRs (quick path).
+    name: iPad & iPhone Duo tests (simulator)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+
+      - name: Pick the simulators and start booting the iPad
+        run: |
+          IPAD="$(.github/scripts/pick-simulator.sh iPad)"
+          DUO="$(.github/scripts/pick-simulator.sh "iPhone Duo")"
+          echo "IPAD_UDID=$IPAD" >> "$GITHUB_ENV"
+          echo "DUO_UDID=$DUO" >> "$GITHUB_ENV"
+          # A device's first boot is slow; the iPad boots while the app builds. Only one simulator runs at a
+          # time, so the two never compete for this machine.
+          xcrun simctl boot "$IPAD" || true
+
+      - name: Cache XcodeGen
+        uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"   # a slow cache gives up quickly; XcodeGen is then downloaded
+        with:
+          path: ~/.xcodegen
+          key: xcodegen-${{ env.XCODEGEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install XcodeGen
+        run: .github/scripts/install-xcodegen.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$IPAD_UDID" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
+
+      - name: Wait for the iPad simulator to finish booting
+        run: xcrun simctl bootstatus "$IPAD_UDID" -b
+
       - name: Test on iPad simulator (sidebar layout)
-        if: env.FULL == 'true'
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -114,23 +181,48 @@ jobs:
             -derivedDataPath DerivedData \
             -resultBundlePath results/iPad.xcresult \
             -only-testing:JiggerUITests/JiggerUITests/testIPadShowsSidebarAndSummaryBesideTheCalculator \
+            -only-testing:JiggerUITests/JiggerUITests/testAppFillsTheScreenAndTheKeyboardLinesUp \
+            -only-testing:JiggerUITests/JiggerUITests/testIngredientEditorOpensAndCloses \
+            -only-testing:JiggerUITests/JiggerUITests/testAddAnIngredientInMyIngredients \
+            -parallel-testing-enabled NO \
+            -quiet
+
+      - name: Swap to the iPhone Duo simulator
+        if: ${{ !cancelled() }}   # Duo results are useful even when an iPad test fails
+        run: |
+          xcrun simctl shutdown "$IPAD_UDID" || true
+          xcrun simctl boot "$DUO_UDID" || true
+          xcrun simctl bootstatus "$DUO_UDID" -b
+
+      - name: Test on iPhone Duo simulator (full screen, keyboard, editor)
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project Jigger.xcodeproj -scheme Jigger \
+            -destination "id=$DUO_UDID" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath results/Duo.xcresult \
+            -only-testing:JiggerUITests/JiggerUITests/testAppFillsTheScreenAndTheKeyboardLinesUp \
+            -only-testing:JiggerUITests/JiggerUITests/testFirstLaunchShowsTheMargaritaExampleWithCorrectTotals \
+            -only-testing:JiggerUITests/JiggerUITests/testNumberFieldsUseANumberKeyboard \
+            -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnMix \
+            -only-testing:JiggerUITests/JiggerUITests/testKeyboardCanBeClosedOnSettings \
+            -only-testing:JiggerUITests/JiggerUITests/testAddAnIngredientInMyIngredients \
+            -only-testing:JiggerUITests/JiggerUITests/testIngredientEditorOpensAndCloses \
             -parallel-testing-enabled NO \
             -quiet
 
       - name: Test counts
         if: always()
         run: |
-          .github/scripts/test-summary.sh "iPhone" results/iPhone.xcresult
-          if [ "$FULL" = "true" ]; then
-            .github/scripts/test-summary.sh "iPad" results/iPad.xcresult
-          else
-            echo "### Draft PR: quick path (UI and iPad tests run once the PR is marked ready for review)" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          .github/scripts/test-summary.sh "iPad" results/iPad.xcresult
+          .github/scripts/test-summary.sh "iPhone Duo" results/Duo.xcresult
 
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: test-results
+          name: device-test-results
           path: results/
           retention-days: 7

@@ -52,6 +52,11 @@ enum Theme {
     static let emphasis = futura(16, .bold, relativeTo: .body)
     static let note = futura(13, .italic, relativeTo: .footnote)
 
+    /// What people type is set in the system font (San Francisco), like every Apple app, so numbers and
+    /// names read and edit naturally with Dynamic Type. Futura stays for labels, titles and figures.
+    static let input = Font.body
+    static let inputSmall = Font.subheadline
+
     /// Prices and totals: heavy, condensed, unmistakable.
     static func figure(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> Font {
         futura(size, .condensedBold, relativeTo: style)
@@ -122,7 +127,5 @@ enum ChromeAppearance {
         UISegmentedControl.appearance().setTitleTextAttributes([.font: segment], for: .normal)
         UISegmentedControl.appearance().setTitleTextAttributes([.font: Theme.uiFutura(14, .bold, style: .subheadline)], for: .selected)
 
-        UITextField.appearance(whenContainedInInstancesOf: [UISearchBar.self]).defaultTextAttributes =
-            [.font: Theme.uiFutura(16, .medium, style: .body)]
     }
 }
