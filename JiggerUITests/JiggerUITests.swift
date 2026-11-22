@@ -59,9 +59,13 @@ final class JiggerUITests: XCTestCase {
         e.tap()
     }
 
+    /// Opens a section: the bottom tab bar (iPhone), Apple's floating tab bar (iPhone Duo and other
+    /// regular-width screens without room for a sidebar, whose tabs are plain buttons), or the iPad sidebar.
     private func goTo(_ tab: String, sidebarID: String) {
         let tabButton = app.tabBars.buttons[tab].firstMatch
         if tabButton.waitForExistence(timeout: 3) { tabButton.tap(); return }
+        let floatingTab = app.buttons[tab].firstMatch
+        if floatingTab.exists && floatingTab.isHittable { floatingTab.tap(); return }
         let sidebarItem = element(sidebarID)
         guard sidebarItem.waitForExistence(timeout: 5) else {
             return XCTFail("Neither a \(tab) tab nor sidebar item. UI: \(uiTree())")
@@ -69,9 +73,12 @@ final class JiggerUITests: XCTestCase {
         sidebarItem.tap()
     }
 
-    /// The start of the app's accessibility tree, attached to failures so CI shows what was on screen.
+    /// What's on screen, compactly: navigation bars and every button (identifier|label). Attached to
+    /// failures so CI shows exactly what the test could have tapped.
     private func uiTree() -> String {
-        String(app.debugDescription.prefix(2500))
+        let bars = app.navigationBars.allElementsBoundByIndex.map { $0.identifier }
+        let buttons = app.buttons.allElementsBoundByIndex.prefix(80).map { "\($0.identifier)|\($0.label)" }
+        return "navigation bars: \(bars); buttons: \(buttons.joined(separator: ", "))"
     }
 
     private func waitForToastToClear() {
@@ -109,12 +116,16 @@ final class JiggerUITests: XCTestCase {
     private func closeEditor() {
         dismissKeyboard()
         waitForToastToClear()
-        let done = app.buttons["editor.done"].firstMatch
-        guard done.waitForExistence(timeout: 5) else {
+        // By identifier, or by its visible "Done" label in the sheet's navigation bar: both are what a person taps.
+        var done = app.buttons["editor.done"].firstMatch
+        if !done.waitForExistence(timeout: 5) {
+            done = app.navigationBars.buttons["Done"].firstMatch
+        }
+        guard done.waitForExistence(timeout: 3) else {
             return XCTFail("The editor's Done button is missing. UI: \(uiTree())")
         }
         done.tap()
-        _ = done.waitForNonExistence(timeout: 5)
+        _ = app.textFields["editor.amount"].firstMatch.waitForNonExistence(timeout: 5)
     }
 
     private var keyboardHasLetters: Bool {
