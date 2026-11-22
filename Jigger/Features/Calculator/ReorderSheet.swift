@@ -43,7 +43,7 @@ struct ReorderSheet: View {
             .navigationTitle("Reorder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: { Text("Done").font(Theme.emphasis) }
                         .accessibilityIdentifier("reorderDone")
                 }

@@ -230,16 +230,16 @@ struct LibraryItemEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if existingID == nil {
-                    ToolbarItem(placement: .cancellationAction) {
+                    ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") { dismiss() }.accessibilityIdentifier("libEditor.cancel")
                     }
-                    ToolbarItem(placement: .confirmationAction) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { save() } label: { Text("Save").font(Theme.emphasis) }
                             .disabled(!messages.isEmpty)
                             .accessibilityIdentifier("libEditor.save")
                     }
                 } else {
-                    ToolbarItem(placement: .confirmationAction) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { dismiss() } label: { Text("Done").font(Theme.emphasis) }
                             .accessibilityIdentifier("libEditor.done")
                     }

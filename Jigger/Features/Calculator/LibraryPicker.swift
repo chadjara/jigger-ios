@@ -42,7 +42,7 @@ struct LibraryPicker: View {
             .navigationTitle("My Ingredients")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: { Text("Cancel").font(Theme.body) }
                 }
             }

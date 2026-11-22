@@ -33,7 +33,7 @@ struct IngredientEditor: View {
             .background(Theme.bg.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: { Text("Done").font(Theme.emphasis) }
                         .accessibilityIdentifier("editor.done")
                 }
