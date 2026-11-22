@@ -43,7 +43,9 @@ final class JiggerUITests: XCTestCase {
         dismissKeyboard()
         let f = field(id)
         XCTAssertTrue(f.waitForExistence(timeout: 5), "\(id) not found")
-        revealField(f)
+        // In the ingredient editor the bottom Done bar can cover a field, so scroll it clear first.
+        // Elsewhere a plain tap scrolls the field into view by itself.
+        if id.hasPrefix("editor.") { revealField(f) }
         f.tap()
         if let current = f.value as? String, !current.isEmpty, current != f.placeholderValue {
             f.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
@@ -111,6 +113,21 @@ final class JiggerUITests: XCTestCase {
         while !f.isHittable && tries < 4 {
             app.swipeUp()
             tries += 1
+            // Let the scroll settle: a tap on a still-moving list only stops it and never focuses the field.
+            Thread.sleep(forTimeInterval: 1)
+        }
+    }
+
+    /// Scrolls the open sheet back to the top until the element (e.g. the live cost header) is loaded again.
+    private func revealTop(_ id: String) {
+        let target = element(id)
+        var tries = 0
+        // Only swipe while it's unloaded (i.e. the list is scrolled down): swiping down on a sheet that is
+        // already at the top would close it.
+        while !target.exists && tries < 4 {
+            app.swipeDown()
+            tries += 1
+            Thread.sleep(forTimeInterval: 1)
         }
     }
 
@@ -171,6 +188,7 @@ final class JiggerUITests: XCTestCase {
         type("editor.price", "24.99")
         type("editor.amount", "2")
         dismissKeyboard()
+        revealTop("editor.cost")
         XCTAssertEqual(text("editor.cost"), "$1.97")
         closeEditor()
         XCTAssertEqual(text("row0.cost"), "$1.97")
