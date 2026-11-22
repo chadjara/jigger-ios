@@ -61,7 +61,17 @@ final class JiggerUITests: XCTestCase {
 
     private func goTo(_ tab: String, sidebarID: String) {
         let tabButton = app.tabBars.buttons[tab].firstMatch
-        if tabButton.exists { tabButton.tap() } else { tap(sidebarID) }
+        if tabButton.waitForExistence(timeout: 3) { tabButton.tap(); return }
+        let sidebarItem = element(sidebarID)
+        guard sidebarItem.waitForExistence(timeout: 5) else {
+            return XCTFail("Neither a \(tab) tab nor sidebar item. UI: \(uiTree())")
+        }
+        sidebarItem.tap()
+    }
+
+    /// The start of the app's accessibility tree, attached to failures so CI shows what was on screen.
+    private func uiTree() -> String {
+        String(app.debugDescription.prefix(2500))
     }
 
     private func waitForToastToClear() {
@@ -98,8 +108,13 @@ final class JiggerUITests: XCTestCase {
 
     private func closeEditor() {
         dismissKeyboard()
-        tap("editor.done")
-        _ = app.buttons["editor.done"].waitForNonExistence(timeout: 5)
+        waitForToastToClear()
+        let done = app.buttons["editor.done"].firstMatch
+        guard done.waitForExistence(timeout: 5) else {
+            return XCTFail("The editor's Done button is missing. UI: \(uiTree())")
+        }
+        done.tap()
+        _ = done.waitForNonExistence(timeout: 5)
     }
 
     private var keyboardHasLetters: Bool {
@@ -348,7 +363,9 @@ final class JiggerUITests: XCTestCase {
     func testAppFillsTheScreenAndTheKeyboardLinesUp() {
         launch()
         let window = app.windows.firstMatch
-        let screen = UIScreen.main.bounds
+        // SpringBoard's frame is the whole display (UIScreen.main in the test runner isn't reliable on iPhone Duo).
+        let screen = XCUIApplication(bundleIdentifier: "com.apple.springboard").frame
+        XCTAssertGreaterThan(screen.width, 0, "couldn't read the display size")
         XCTAssertEqual(window.frame.width, screen.width, accuracy: 1, "app window is narrower than the screen")
         XCTAssertEqual(window.frame.height, screen.height, accuracy: 1, "app window is shorter than the screen")
         let f = field("menuPrice")

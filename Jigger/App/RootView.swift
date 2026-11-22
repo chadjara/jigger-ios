@@ -35,15 +35,33 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// iPad (regular width): sidebar navigation. iPhone (compact width): tabs.
+/// Sidebar navigation where there's room for it (iPad); tabs everywhere else (iPhone, iPhone Duo, and
+/// narrow iPad split screen). The iPhone Duo reports a regular size class on screens too narrow for a
+/// sidebar, so the choice also needs real width.
 struct RootView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var section: AppSection = .calculator
 
+    /// Narrowest width that shows the sidebar beside the content.
+    private static let sidebarMinWidth: CGFloat = 700
+
     var body: some View {
+        GeometryReader { geo in
+            let wide = sizeClass == .regular && geo.size.width >= Self.sidebarMinWidth
+            layout(wide: wide)
+                .overlay(alignment: .bottom) { toastOverlay(wide: wide) }
+        }
+        .font(Theme.body)
+        .background(Theme.bg.ignoresSafeArea())
+        // A light tap when something is saved, removed or undone, like Apple's own apps.
+        .sensoryFeedback(.impact(weight: .light), trigger: store.toast?.id)
+    }
+
+    @ViewBuilder
+    private func layout(wide: Bool) -> some View {
         Group {
-            if sizeClass == .regular {
+            if wide {
                 NavigationSplitView {
                     List(AppSection.allCases, selection: sectionSelection) { s in
                         Label { Text(s.title).font(Theme.body) } icon: { s.icon }
@@ -67,11 +85,6 @@ struct RootView: View {
                 }
             }
         }
-        .font(Theme.body)
-        .background(Theme.bg.ignoresSafeArea())
-        .overlay(alignment: .bottom) { toastOverlay }
-        // A light tap when something is saved, removed or undone, like Apple's own apps.
-        .sensoryFeedback(.impact(weight: .light), trigger: store.toast?.id)
     }
 
     private var sectionSelection: Binding<AppSection?> {
@@ -94,18 +107,18 @@ struct RootView: View {
     }
 
     /// Sits just above the Mix cost bar on iPhone, above the tab bar elsewhere, and low on iPad.
-    private var toastBottomPadding: CGFloat {
-        if sizeClass == .regular { return 24 }
+    private func toastBottomPadding(wide: Bool) -> CGFloat {
+        if wide { return 24 }
         return section == .calculator ? 118 : 60
     }
 
     @ViewBuilder
-    private var toastOverlay: some View {
+    private func toastOverlay(wide: Bool) -> some View {
         ZStack {
             if let toast = store.toast {
                 ToastView(message: toast.message, canUndo: toast.undo != nil,
                           undo: { store.undoToast() }, dismiss: { store.toast = nil })
-                    .padding(.bottom, toastBottomPadding)
+                    .padding(.bottom, toastBottomPadding(wide: wide))
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .id(toast.id)
                     .task(id: toast.id) {
