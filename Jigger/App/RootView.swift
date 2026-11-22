@@ -48,10 +48,12 @@ struct RootView: View {
     /// Narrowest width that shows the sidebar beside the content.
     private static let sidebarMinWidth: CGFloat = 700
 
-    /// Regular size class with room for a sidebar. Before the first measurement, trust the size class,
-    /// so an iPad doesn't build tabs first and then switch.
+    /// Regular size class with room for a sidebar. Before the first measurement, guess from the device:
+    /// iPads start with the sidebar, iPhones (iPhone Duo included) with tabs, so neither builds one layout
+    /// and then rebuilds the other at launch.
     private var wide: Bool {
-        sizeClass == .regular && (width.map { $0 >= Self.sidebarMinWidth } ?? true)
+        sizeClass == .regular
+            && (width.map { $0 >= Self.sidebarMinWidth } ?? (UIDevice.current.userInterfaceIdiom == .pad))
     }
 
     var body: some View {

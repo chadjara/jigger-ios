@@ -43,6 +43,7 @@ final class JiggerUITests: XCTestCase {
         dismissKeyboard()
         let f = field(id)
         XCTAssertTrue(f.waitForExistence(timeout: 5), "\(id) not found")
+        revealField(f)
         f.tap()
         if let current = f.value as? String, !current.isEmpty, current != f.placeholderValue {
             f.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
@@ -101,6 +102,16 @@ final class JiggerUITests: XCTestCase {
     private func openRow(_ index: Int) {
         tap("row\(index)")
         XCTAssertTrue(field("editor.amount").waitForExistence(timeout: 5), "ingredient editor didn't open")
+    }
+
+    /// Scrolls until the field is in view and not covered (e.g. by a sheet's bottom Done bar), as a person
+    /// would before tapping it.
+    private func revealField(_ f: XCUIElement) {
+        var tries = 0
+        while !f.isHittable && tries < 4 {
+            app.swipeUp()
+            tries += 1
+        }
     }
 
     /// Forms only load the rows on screen, so scroll the open sheet until the element is there.
@@ -208,11 +219,13 @@ final class JiggerUITests: XCTestCase {
     func testNumberFieldsUseANumberKeyboard() {
         launch()
         openRow(0)
+        revealField(field("editor.amount"))
         field("editor.amount").tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the pour")
         XCTAssertFalse(keyboardHasLetters, "the pour field should show a number pad, not letters")
         XCTAssertTrue(app.buttons["fraction.½"].exists, "fraction keys should sit above the number pad")
         dismissKeyboard()
+        revealField(field("editor.price"))
         field("editor.price").tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the on-screen keyboard didn't open for the price")
         XCTAssertFalse(keyboardHasLetters, "the price field should show a number pad")
