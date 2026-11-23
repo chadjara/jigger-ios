@@ -45,14 +45,10 @@ final class ScreenshotTests: XCTestCase {
             element("showSummary").tap()
             snap("\(device)-02-summary")
             // The batch section sits further down the tab: scroll it into view before choosing 25.
-            let servings = element("servings.25")
-            var tries = 0
-            while !servings.isHittable && tries < 4 {
-                dragUp()
-                tries += 1
-            }
-            if !servings.isHittable { dragUp() } // one more so the batch totals show under the chips
-            servings.tap()
+            // isHittable already says yes while the chips sit under the cost bar, so always scroll.
+            dragUp()
+            dragUp()
+            element("servings.25").tap()
             snap("\(device)-03-batch")
             openTab("Recipes")
             snap("\(device)-04-recipes")
