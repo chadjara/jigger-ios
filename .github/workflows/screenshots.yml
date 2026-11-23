@@ -80,6 +80,8 @@ jobs:
       contents: write   # only for "commit": pushes the PNGs to this (non-main) branch
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # full history, so the commit step can rebase onto other runs' pushes
 
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: |
