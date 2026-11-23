@@ -19,9 +19,9 @@ EDITABLE = %w[PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED REJECTED METADATA_REJECT
 SETS = {
   "iPhone" => { type: "APP_IPHONE_67", sizes: [[1320, 2868]] },
   "iPad" => { type: "APP_IPAD_PRO_3GEN_129", sizes: [[2064, 2752], [2752, 2064]] },
-  # The iPhone Duo type is new; its name comes from DUO_DISPLAY_TYPE (find it with --list, which asks
-  # Apple for the accepted types). Sizes are left to Apple, which rejects a wrong size on upload.
-  "Duo" => { type: ENV.fetch("DUO_DISPLAY_TYPE", "").strip, sizes: nil }
+  # iPhone Duo: APP_IPHONE_DUO (from Apple's list of accepted types, shown by --list); DUO_DISPLAY_TYPE
+  # overrides it. Sizes are left to Apple, which rejects a wrong size on upload.
+  "Duo" => { type: ENV.fetch("DUO_DISPLAY_TYPE", "").strip.then { |t| t.empty? ? "APP_IPHONE_DUO" : t }, sizes: nil }
 }.freeze
 
 def fail_with(message)

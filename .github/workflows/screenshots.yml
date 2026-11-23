@@ -167,6 +167,7 @@ jobs:
           for DEVICE in ${{ inputs.devices }}; do
             if ls "screenshots/$DEVICE-"*.png >/dev/null 2>&1; then
               git rm -q --ignore-unmatch "docs/app-store/screenshots/$DEVICE-"*.png || true
+              mkdir -p docs/app-store/screenshots   # git removes the folder when it empties
               cp "screenshots/$DEVICE-"*.png docs/app-store/screenshots/
             fi
           done
@@ -174,7 +175,12 @@ jobs:
           if git diff --cached --quiet; then echo "Screenshots unchanged"; exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -q -m "App Store screenshots from run ${{ github.run_id }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          # Other capture runs (one per device) may have pushed meanwhile.
+          for i in 1 2 3; do
+            git pull -q --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep 5
+          done
+          exit 1
 
       - name: Upload screenshots
         if: always()
