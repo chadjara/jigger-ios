@@ -3,7 +3,8 @@
 #   ruby asc_screenshots.rb <folder-of-pngs>
 #
 # Files named iPhone-*.png go to the 6.9" iPhone set (1320 x 2868) and iPad-*.png to the 13" iPad
-# set (2064 x 2752 or 2752 x 2064), in file-name order. Each set that receives files is cleared
+# set (2064 x 2752 or 2752 x 2064), and Duo-*.png to the iPhone Duo set (display type from
+# DUO_DISPLAY_TYPE; Apple checks the size), in file-name order. Each set that receives files is cleared
 # first, so a re-run replaces rather than duplicates. Needs ASC_KEY_PATH, ASC_KEY_ID and
 # ASC_ISSUER_ID. Never prints the key or the token.
 require "digest"
@@ -17,7 +18,10 @@ API = "https://api.appstoreconnect.apple.com"
 EDITABLE = %w[PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED REJECTED METADATA_REJECTED INVALID_BINARY].freeze
 SETS = {
   "iPhone" => { type: "APP_IPHONE_67", sizes: [[1320, 2868]] },
-  "iPad" => { type: "APP_IPAD_PRO_3GEN_129", sizes: [[2064, 2752], [2752, 2064]] }
+  "iPad" => { type: "APP_IPAD_PRO_3GEN_129", sizes: [[2064, 2752], [2752, 2064]] },
+  # The iPhone Duo type is new; its name comes from DUO_DISPLAY_TYPE (find it with --list, which asks
+  # Apple for the accepted types). Sizes are left to Apple, which rejects a wrong size on upload.
+  "Duo" => { type: ENV.fetch("DUO_DISPLAY_TYPE", "").strip, sizes: nil }
 }.freeze
 
 def fail_with(message)
@@ -59,6 +63,17 @@ def api(method, path, body = nil, query = nil)
   res.body.to_s.empty? ? {} : JSON.parse(res.body)
 end
 
+# Like `api`, but returns [status, parsed body] instead of stopping on an error.
+def api_try(method, path, body = nil)
+  uri = URI(API + path)
+  req = Net::HTTP.const_get(method.capitalize).new(uri)
+  req["Authorization"] = "Bearer #{token}"
+  req["Content-Type"] = "application/json"
+  req.body = body.to_json if body
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 20, read_timeout: 60) { |h| h.request(req) }
+  [res.code.to_i, (JSON.parse(res.body) rescue {})]
+end
+
 def png_size(path)
   header = File.binread(path, 24)
   fail_with("#{File.basename(path)} is not a PNG") unless header.start_with?("\x89PNG".b)
@@ -82,6 +97,13 @@ end
 # "--list": print every screenshot set and its files, change nothing.
 if ARGV.first == "--list"
   _, loc = find_localization
+  # Ask Apple which screenshot display types it accepts: an unknown type is refused with the list.
+  code, body = api_try(:post, "/v1/appScreenshotSets", { data: {
+    type: "appScreenshotSets", attributes: { screenshotDisplayType: "NOT_A_TYPE" },
+    relationships: { appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: loc["id"] } } }
+  } })
+  details = (body["errors"] || []).map { |e| e["detail"] || e["title"] }.join("; ")
+  puts "Accepted screenshot display types (from Apple's #{code} reply): #{details}"
   api(:get, "/v1/appStoreVersionLocalizations/#{loc['id']}/appScreenshotSets")["data"].each do |set|
     shots = api(:get, "/v1/appScreenshotSets/#{set['id']}/appScreenshots")["data"]
     puts "#{set.dig('attributes', 'screenshotDisplayType')}: #{shots.size} screenshot(s)"
@@ -98,13 +120,17 @@ folder = ARGV.fetch(0) { fail_with("usage: asc_screenshots.rb <folder> | --list"
 files = Dir[File.join(folder, "*.png")].sort
 groups = SETS.keys.to_h { |device| [device, files.select { |f| File.basename(f).start_with?("#{device}-") }] }
 groups.reject! { |_, list| list.empty? }
-fail_with("No iPhone-*.png or iPad-*.png files in #{folder}") if groups.empty?
+fail_with("No iPhone-*.png, iPad-*.png or Duo-*.png files in #{folder}") if groups.empty?
+if groups.key?("Duo") && SETS["Duo"][:type].empty?
+  puts "::warning::Skipping #{groups['Duo'].size} Duo screenshot(s): set DUO_DISPLAY_TYPE (run with --list to see Apple's types)."
+  groups.delete("Duo")
+end
 
 groups.each do |device, list|
   fail_with("Apple allows at most 10 #{device} screenshots; found #{list.size}") if list.size > 10
   list.each do |f|
     size = png_size(f)
-    unless SETS[device][:sizes].include?(size)
+    unless SETS[device][:sizes].nil? || SETS[device][:sizes].include?(size)
       fail_with("#{File.basename(f)} is #{size.join(' x ')}; the #{device} set needs #{SETS[device][:sizes].map { |s| s.join(' x ') }.join(' or ')}")
     end
   end
