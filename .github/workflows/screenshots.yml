@@ -158,6 +158,19 @@ jobs:
               xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE" || true
               python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY" || true
             fi
+            # The iPad is captured in landscape, but its screenshots come out sideways in a portrait frame
+            # (the screen's top on the image's right): turn those 90 degrees counter-clockwise.
+            if [ "$DEVICE" = iPad ]; then
+              for f in screenshots/iPad-*.png; do
+                [ -f "$f" ] || continue
+                w=$(sips -g pixelWidth "$f" | awk '/pixelWidth/{print $2}')
+                h=$(sips -g pixelHeight "$f" | awk '/pixelHeight/{print $2}')
+                if [ "$h" -gt "$w" ]; then
+                  sips -r 270 "$f" >/dev/null
+                  echo "Turned $(basename "$f") to landscape" | tee -a "$GITHUB_STEP_SUMMARY"
+                fi
+              done
+            fi
             xcrun simctl shutdown "$UDID" || true
           done
           exit $status

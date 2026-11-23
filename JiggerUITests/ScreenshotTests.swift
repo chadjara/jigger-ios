@@ -44,7 +44,15 @@ final class ScreenshotTests: XCTestCase {
             snap("\(device)-01-calculator")
             element("showSummary").tap()
             snap("\(device)-02-summary")
-            element("servings.25").tap()
+            // The batch section sits further down the tab: scroll it into view before choosing 25.
+            let servings = element("servings.25")
+            var tries = 0
+            while !servings.isHittable && tries < 4 {
+                dragUp()
+                tries += 1
+            }
+            if !servings.isHittable { dragUp() } // one more so the batch totals show under the chips
+            servings.tap()
             snap("\(device)-03-batch")
             openTab("Recipes")
             snap("\(device)-04-recipes")
@@ -57,6 +65,14 @@ final class ScreenshotTests: XCTestCase {
         let e = app.descendants(matching: .any)[id].firstMatch
         XCTAssertTrue(e.waitForExistence(timeout: 10), "\(id) not found")
         return e
+    }
+
+    /// Scrolls the screen's content up by about a third of the window, slowly so it stops where it lands.
+    private func dragUp() {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        sleep(1)
     }
 
     /// Taps a tab: the bottom tab bar on iPhone, or Apple's floating tab bar at the top on iPhone Duo
