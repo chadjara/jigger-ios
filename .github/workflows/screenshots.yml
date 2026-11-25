@@ -10,9 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       devices:
-        description: "Devices to capture (iPhone, iPad, both, or none)"
-        default: "iPhone iPad"
+        description: "Devices to capture (any of iPhone iPad Duo, or none)"
+        default: "iPhone iPad Duo"
         required: false
+      commit:
+        description: "Commit the captured screenshots to docs/app-store/screenshots/ on this branch (not main)"
+        type: boolean
+        default: false
       upload:
         description: "Upload to App Store Connect (replaces the screenshots already there)"
         type: boolean
@@ -33,6 +37,14 @@ on:
         description: "Only list the Xcodes and simulators on the runner (looks for iPhone Duo), change nothing"
         type: boolean
         default: false
+      version:
+        description: "Only create the App Store version (MARKETING_VERSION) and attach its build; changes no text"
+        type: boolean
+        default: false
+      duo_type:
+        description: "App Store Connect display type for iPhone Duo screenshots (shown by list_only)"
+        default: ""
+        required: false
       ipad_from_run:
         description: "Use iPad screenshots from this earlier Screenshots run ID instead of capturing"
         default: ""
@@ -65,11 +77,15 @@ jobs:
 
   screenshots:
     name: Capture App Store screenshots
-    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill
+    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill && !inputs.version
     runs-on: xcode-27
-    timeout-minutes: 40
+    timeout-minutes: 60
+    permissions:
+      contents: write   # only for "commit": pushes the PNGs to this (non-main) branch
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # full history, so the commit step can rebase onto other runs' pushes
 
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: |
@@ -94,6 +110,9 @@ jobs:
         run: |
           echo "IPHONE_UDID=$(.github/scripts/pick-simulator.sh "iPhone 18 Pro Max")" >> "$GITHUB_ENV"
           echo "IPAD_UDID=$(.github/scripts/pick-simulator.sh "iPad Pro 13-inch")" >> "$GITHUB_ENV"
+          case " ${{ inputs.devices }} " in
+            *" Duo "*) echo "DUO_UDID=$(.github/scripts/pick-simulator.sh "iPhone Duo")" >> "$GITHUB_ENV" ;;
+          esac
 
       - name: Build for testing
         # Build before booting anything (as CI does): booting the simulators first left xcodebuild
@@ -107,24 +126,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
-      - name: Boot simulators with a clean 9:41 status bar
-        run: |
-          for UDID in "$IPHONE_UDID" "$IPAD_UDID"; do
-            xcrun simctl boot "$UDID"
-            xcrun simctl bootstatus "$UDID" -b
-            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
-              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
-          done
-
       - name: Capture screenshots
+        # One simulator at a time (boot, capture, shut down), so they never compete for the machine.
         env:
-          TEST_RUNNER_JIGGER_SCREENSHOTS: "1"
-          DEVICES: ${{ inputs.devices || 'iPhone iPad' }}
+          DEVICES: ${{ inputs.devices || 'iPhone iPad Duo' }}
         run: |
           status=0
           for DEVICE in $DEVICES; do
-            if [ "$DEVICE" = iPhone ]; then UDID="$IPHONE_UDID"; else UDID="$IPAD_UDID"; fi
-            if ! xcodebuild test-without-building \
+            case "$DEVICE" in
+              iPhone) UDID="$IPHONE_UDID" ;;
+              iPad) UDID="$IPAD_UDID" ;;
+              Duo) UDID="$DUO_UDID" ;;
+              *) echo "::error::Unknown device $DEVICE"; status=1; continue ;;
+            esac
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100 || true
+            if ! TEST_RUNNER_JIGGER_SCREENSHOTS=1 TEST_RUNNER_JIGGER_SCREENSHOT_DEVICE="$([ "$DEVICE" = Duo ] && echo Duo)" \
+              xcodebuild test-without-building \
               -project Jigger.xcodeproj -scheme Jigger \
               -destination "id=$UDID" \
               -destination-timeout 180 \
@@ -142,8 +162,31 @@ jobs:
               xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE" || true
               python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY" || true
             fi
+            xcrun simctl shutdown "$UDID" || true
           done
           exit $status
+
+      - name: Commit screenshots to this branch
+        if: always() && inputs.commit && github.ref_name != 'main'
+        run: |
+          if ! ls screenshots/*.png >/dev/null 2>&1; then echo "No screenshots to commit"; exit 0; fi
+          for DEVICE in ${{ inputs.devices }}; do
+            if ls "screenshots/$DEVICE-"*.png >/dev/null 2>&1; then
+              git rm -q --ignore-unmatch "docs/app-store/screenshots/$DEVICE-"*.png || true
+              mkdir -p docs/app-store/screenshots   # git removes the folder when it empties
+              cp "screenshots/$DEVICE-"*.png docs/app-store/screenshots/
+            fi
+          done
+          git add docs/app-store/screenshots
+          if git diff --cached --quiet; then echo "Screenshots unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "App Store screenshots from run ${{ github.run_id }}"
+          # Other capture runs (one per device) may have pushed meanwhile.
+          for i in 1 2 3; do
+            git pull -q --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep 5
+          done
+          exit 1
 
       - name: Upload screenshots
         if: always()
@@ -156,7 +199,7 @@ jobs:
   upload:
     name: Upload to App Store Connect
     needs: screenshots
-    if: always() && (inputs.upload || inputs.check || inputs.fill) && !inputs.inspect
+    if: always() && (inputs.upload || inputs.check || inputs.fill || inputs.version) && !inputs.inspect
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -192,9 +235,12 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          DUO_DISPLAY_TYPE: ${{ inputs.duo_type }}
         run: |
           export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
-          if [ "${{ inputs.fill }}" = "true" ]; then
+          if [ "${{ inputs.version }}" = "true" ]; then
+            ruby .github/scripts/asc_version.rb | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ inputs.fill }}" = "true" ]; then
             status=0
             ruby .github/scripts/asc_fill.rb | tee -a "$GITHUB_STEP_SUMMARY" || status=1
             ruby .github/scripts/asc_check.rb | tee -a "$GITHUB_STEP_SUMMARY"

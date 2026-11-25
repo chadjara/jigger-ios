@@ -52,7 +52,7 @@ Everything builds in GitHub Actions; no Mac is needed.
 Two numbers identify every upload: the **version** (`MARKETING_VERSION` in `project.yml`) and the **build number** (the `TestFlight` workflow's run number, set automatically). TestFlight shows them as "1.0.0 (4)".
 
 - **Before the App Store launch:** the version stays **1.0.0**. Each TestFlight upload is a new build of 1.0.0 (builds 4, 5, 6, …), and the first App Store release ships as 1.0.0.
-- **After launch** (semantic versioning): 1.0.1 for fixes, 1.1.0 for new features, 2.0.0 for a major overhaul. Change `MARKETING_VERSION` in the PR that starts the release; the build number keeps counting up on its own.
+- **After launch** (semantic versioning, live since November 2026 at 1.0.0): 1.0.1 for fixes, 1.1.0 for new features, 2.0.0 for a major overhaul. Change `MARKETING_VERSION` in the PR that starts the release; the build number keeps counting up on its own.
 
 ### Signing setup (one time)
 

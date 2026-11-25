@@ -12,7 +12,7 @@ count = 0
 for test in json.loads((src / "manifest.json").read_text()):
     for a in test.get("attachments", []):
         name = a.get("suggestedHumanReadableName", "")
-        if not name.startswith(("iPhone-", "iPad-")):
+        if not name.startswith(("iPhone-", "iPad-", "Duo-")):
             continue
         out = dest / (name.split("_")[0] + ".png")
         shutil.copyfile(src / a["exportedFileName"], out)

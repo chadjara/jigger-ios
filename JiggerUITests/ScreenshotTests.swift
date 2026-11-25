@@ -1,7 +1,8 @@
 import XCTest
 
 /// Captures App Store screenshots. Skipped in normal CI; the Screenshots workflow runs it with
-/// TEST_RUNNER_JIGGER_SCREENSHOTS=1 on the 6.9" iPhone and 13" iPad simulators and exports the images.
+/// TEST_RUNNER_JIGGER_SCREENSHOTS=1 on the 6.9" iPhone, 13" iPad and iPhone Duo simulators and exports the images.
+/// TEST_RUNNER_JIGGER_SCREENSHOT_DEVICE names the files' prefix (e.g. "Duo"); otherwise iPhone or iPad.
 final class ScreenshotTests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -13,18 +14,14 @@ final class ScreenshotTests: XCTestCase {
 
     func testAppStoreScreenshots() {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let device = isPad ? "iPad" : "iPhone"
+        let device = ProcessInfo.processInfo.environment["JIGGER_SCREENSHOT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 }
+            ?? (isPad ? "iPad" : "iPhone")
         app = XCUIApplication()
         app.launchArguments = ["-uitesting", "-reset", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launchEnvironment["JIGGER_SEED"] = DemoData.backup
         app.launch()
         XCTAssertTrue(element("recipeName").waitForExistence(timeout: 20))
-        // Rotate after launch (set before launch, the simulator reverted to portrait),
-        // so the iPad sidebar is on screen.
-        if isPad {
-            XCUIDevice.shared.orientation = .landscapeLeft
-            sleep(2)
-        }
+        // iPad stays portrait: landscape App Store screenshots show up sideways in share cards.
 
         // Save the Margarita so the "illustrative prices" banner and toast are gone.
         element("saveRecipe").tap()
@@ -42,11 +39,15 @@ final class ScreenshotTests: XCTestCase {
             snap("\(device)-01-calculator")
             element("showSummary").tap()
             snap("\(device)-02-summary")
+            // The batch section sits further down the tab: scroll it into view before choosing 25.
+            // isHittable already says yes while the chips sit under the cost bar, so always scroll.
+            dragUp()
+            dragUp()
             element("servings.25").tap()
             snap("\(device)-03-batch")
-            app.tabBars.buttons["Recipes"].tap()
+            openTab("Recipes")
             snap("\(device)-04-recipes")
-            app.tabBars.buttons["Ingredients"].tap()
+            openTab("Ingredients")
             snap("\(device)-05-ingredients")
         }
     }
@@ -55,6 +56,24 @@ final class ScreenshotTests: XCTestCase {
         let e = app.descendants(matching: .any)[id].firstMatch
         XCTAssertTrue(e.waitForExistence(timeout: 10), "\(id) not found")
         return e
+    }
+
+    /// Scrolls the screen's content up by about a third of the window, slowly so it stops where it lands.
+    private func dragUp() {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        sleep(1)
+    }
+
+    /// Taps a tab: the bottom tab bar on iPhone, or Apple's floating tab bar at the top on iPhone Duo
+    /// (its tabs are plain buttons).
+    private func openTab(_ title: String) {
+        let bottom = app.tabBars.buttons[title].firstMatch
+        if bottom.waitForExistence(timeout: 3) { return bottom.tap() }
+        let floating = app.buttons[title].firstMatch
+        XCTAssertTrue(floating.waitForExistence(timeout: 10), "\(title) tab not found")
+        floating.tap()
     }
 
     /// Taps a sidebar entry, revealing the sidebar first if it is collapsed.
