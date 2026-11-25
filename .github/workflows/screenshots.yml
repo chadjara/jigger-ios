@@ -37,6 +37,10 @@ on:
         description: "Only list the Xcodes and simulators on the runner (looks for iPhone Duo), change nothing"
         type: boolean
         default: false
+      version:
+        description: "Only create the App Store version (MARKETING_VERSION) and attach its build; changes no text"
+        type: boolean
+        default: false
       duo_type:
         description: "App Store Connect display type for iPhone Duo screenshots (shown by list_only)"
         default: ""
@@ -73,7 +77,7 @@ jobs:
 
   screenshots:
     name: Capture App Store screenshots
-    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill
+    if: inputs.devices != 'none' && !inputs.inspect && !inputs.check && !inputs.fill && !inputs.version
     runs-on: xcode-27
     timeout-minutes: 60
     permissions:
@@ -158,19 +162,6 @@ jobs:
               xcrun xcresulttool export attachments --path "results/$DEVICE.xcresult" --output-path "attachments/$DEVICE" || true
               python3 .github/scripts/export-screenshots.py "attachments/$DEVICE" screenshots | tee -a "$GITHUB_STEP_SUMMARY" || true
             fi
-            # The iPad is captured in landscape, but its screenshots come out sideways in a portrait frame
-            # (the screen's top on the image's right): turn those 90 degrees counter-clockwise.
-            if [ "$DEVICE" = iPad ]; then
-              for f in screenshots/iPad-*.png; do
-                [ -f "$f" ] || continue
-                w=$(sips -g pixelWidth "$f" | awk '/pixelWidth/{print $2}')
-                h=$(sips -g pixelHeight "$f" | awk '/pixelHeight/{print $2}')
-                if [ "$h" -gt "$w" ]; then
-                  sips -r 270 "$f" >/dev/null
-                  echo "Turned $(basename "$f") to landscape" | tee -a "$GITHUB_STEP_SUMMARY"
-                fi
-              done
-            fi
             xcrun simctl shutdown "$UDID" || true
           done
           exit $status
@@ -208,7 +199,7 @@ jobs:
   upload:
     name: Upload to App Store Connect
     needs: screenshots
-    if: always() && (inputs.upload || inputs.check || inputs.fill) && !inputs.inspect
+    if: always() && (inputs.upload || inputs.check || inputs.fill || inputs.version) && !inputs.inspect
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -247,7 +238,9 @@ jobs:
           DUO_DISPLAY_TYPE: ${{ inputs.duo_type }}
         run: |
           export MARKETING_VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"\([^"]*\)".*/\1/p' project.yml)"
-          if [ "${{ inputs.fill }}" = "true" ]; then
+          if [ "${{ inputs.version }}" = "true" ]; then
+            ruby .github/scripts/asc_version.rb | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ inputs.fill }}" = "true" ]; then
             status=0
             ruby .github/scripts/asc_fill.rb | tee -a "$GITHUB_STEP_SUMMARY" || status=1
             ruby .github/scripts/asc_check.rb | tee -a "$GITHUB_STEP_SUMMARY"

@@ -21,12 +21,7 @@ final class ScreenshotTests: XCTestCase {
         app.launchEnvironment["JIGGER_SEED"] = DemoData.backup
         app.launch()
         XCTAssertTrue(element("recipeName").waitForExistence(timeout: 20))
-        // Rotate after launch (set before launch, the simulator reverted to portrait),
-        // so the iPad sidebar is on screen.
-        if isPad {
-            XCUIDevice.shared.orientation = .landscapeLeft
-            sleep(2)
-        }
+        // iPad stays portrait: landscape App Store screenshots show up sideways in share cards.
 
         // Save the Margarita so the "illustrative prices" banner and toast are gone.
         element("saveRecipe").tap()
